@@ -1,6 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
+use std::fs;
+use log::{info, error, warn, debug};
+
+mod ast;
 
 /// Alalyzer static tool for Solana/Anchor contracts in Rust
 #[derive(Parser, Debug)]
@@ -28,8 +32,12 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    // Initialize logger
+    env_logger::init();
+    
     // Parse arguments from command line
     let args = Cli::parse();
+    debug!("CLI arguments: {:?}", args);
 
     // Verify that the path exists
     if !args.path.exists() {
@@ -40,11 +48,23 @@ fn main() -> Result<()> {
     if !args.path.is_dir() {
         anyhow::bail!("Path {} is not a directory", args.path.display());
     }
+
+    info!("Starting analysis on directory: {}", args.path.display());
+    let results = ast::parser::process_directory(&args.path)?;
+    info!("Found {} Rust files to analyze", results.len());
+    if args.ast {
+        for (path, ast) in &results {
+            let json = ast::json::ast_to_json(&ast)?;
+            let mut json_path = path.clone();
+            json_path.set_extension("json");
+            fs::write(json_path, json)?;
+            info!("AST JSON generated for {}", path.display());
+        }
+    }
     // TODO: Main logic
-    // 1. Generate AST
     // 2. Analyze vulnerabilities
     // 3. Generate report
     
-    println!("[i] Analysis completed. Implementation pending.");
+    info!("Analysis completed. Implementation pending.");
     Ok(())
 }

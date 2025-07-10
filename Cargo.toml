@@ -8,9 +8,11 @@ authors = ["secoalba <git.seco@protonmail.com>"]
 [dependencies]
 # Rust syntax analysis
 # full => full Rust features
-#parsing => parse Rust code as text
-#extra-traits => Debug, Eq traits for AST types
+# parsing => parse Rust code as text
+# extra-traits => Debug, Eq traits for AST types
+# syn-serde => Serialize/Deserialize for AST types
 syn = { version = "2.0", features = ["full", "parsing", "extra-traits"] }
+syn-serde  = { version = "0.3", features = ["json"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 
@@ -19,8 +21,13 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # CLI and error handling
+# clap => command line argument parsing
+# anyhow => error handling
 clap = { version = "4.0", features = ["derive"] }
 anyhow = "1.0"
 
 # File system utilities
+# walkdir => directory traversal
 walkdir = "2.3"
+log = "0.4"
+env_logger = "0.11.8"
