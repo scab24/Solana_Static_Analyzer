@@ -1,11 +1,16 @@
-// Declare the submodule dsl
+// Declare submodules
 pub mod dsl;
+pub mod engine;
+pub mod rules;
 
-// Importations standard
-use std::path::Path;
-use syn::File;
+// Standard imports
 use std::collections::HashMap;
-use log::{info, debug, warn};
+use std::path::Path;
+use std::time::{Duration, Instant};
+use std::sync::Arc;
+use log::{debug, info, warn, error};
+use syn::File;
+use anyhow::Context;
 
 /// Severity level of a vulnerability
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -47,9 +52,7 @@ pub struct Finding {
 /// Custom result type for analyzer operations
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-pub mod rules {
-    // TODO: Implement rules
-}
+pub use engine::{Rule, RuleEngine, RuleEngineConfig, RuleType, create_rule_engine, create_rule_engine_with_config};
 
 /// Result of an analysis
 #[derive(Debug)]
@@ -73,31 +76,32 @@ pub struct AnalysisStats {
     pub findings_by_severity: HashMap<Severity, usize>,
 }
 
-/// Options for analysis configuration
-#[derive(Debug, Clone)]
+/// Options for analysis
+#[derive(Debug, Clone, Default)]
 pub struct AnalysisOptions {
-    /// Severities to ignore
-    pub ignore_severities: Vec<Severity>,
+    /// Whether to generate AST JSON files
+    pub generate_ast: bool,
+    
     /// Path to custom templates
     pub custom_templates_path: Option<String>,
-    /// Whether to generate AST JSON
-    pub generate_ast: bool,
+    
+    /// Severities to ignore
+    pub ignore_severities: Vec<Severity>,
+    
+    /// Rule IDs to ignore
+    pub ignore_rules: Vec<String>,
+    
+    /// Rule types to include
+    pub include_rule_types: Vec<RuleType>,
 }
 
-impl Default for AnalysisOptions {
-    fn default() -> Self {
-        Self {
-            ignore_severities: Vec::new(),
-            custom_templates_path: None,
-            generate_ast: false,
-        }
-    }
-}
-
-/// Main analyzer
+/// Analyzer for Solana contracts
 pub struct Analyzer {
-    /// Configuration options
+    /// Options for analysis
     options: AnalysisOptions,
+    
+    /// Rule engine
+    rule_engine: RuleEngine,
 }
 
 impl Analyzer {
@@ -105,23 +109,55 @@ impl Analyzer {
     pub fn new() -> Self {
         Self {
             options: AnalysisOptions::default(),
+            rule_engine: create_rule_engine(),
         }
     }
     
-    /// Creates a new analyzer with custom options
+    /// Creates a new analyzer with the given options
     pub fn with_options(options: AnalysisOptions) -> Self {
-        Self { options }
+        // Convert analysis options to rule engine config
+        let config = RuleEngineConfig {
+            custom_templates_path: options.custom_templates_path.clone(),
+            ignore_severities: options.ignore_severities.clone(),
+            ignore_rules: options.ignore_rules.clone(),
+            include_rule_types: options.include_rule_types.clone(),
+        };
+        
+        let mut rule_engine = create_rule_engine_with_config(config);
+        
+        // Load built-in rules
+        if let Err(e) = rule_engine.load_builtin_rules() {
+            warn!("Failed to load built-in rules: {}", e);
+        }
+        
+        // Load custom rules if specified
+        if let Some(templates_path) = &options.custom_templates_path {
+            let path = Path::new(templates_path);
+            if path.exists() && path.is_dir() {
+                if let Err(e) = rule_engine.load_yaml_rules(path) {
+                    warn!("Failed to load YAML rules from {}: {}", path.display(), e);
+                }
+            } else {
+                warn!("Custom templates path does not exist or is not a directory: {}", path.display());
+            }
+        }
+        
+        Self {
+            options,
+            rule_engine,
+        }
     }
     
-    /// Analyzes a Rust file
+    /// Analyzes a single file
     pub fn analyze_file(&self, file_path: &str, ast: &File) -> Result<Vec<Finding>> {
         debug!("Analyzing file: {}", file_path);
         
-        let mut findings = Vec::new();
+        // Execute rules on the AST
+        let findings = self.rule_engine.execute_rules(ast, file_path)
+            .with_context(|| format!("Failed to execute rules on {}", file_path))?;
         
-        // TODO: Implement rules
+        debug!("Found {} issues in {}", findings.len(), file_path);
         
-        debug!("Analysis completed for {}: {} findings", file_path, findings.len());
         Ok(findings)
     }
 
