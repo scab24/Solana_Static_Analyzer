@@ -11,7 +11,7 @@ authors = ["secoalba <git.seco@protonmail.com>"]
 # parsing => parse Rust code as text
 # extra-traits => Debug, Eq traits for AST types
 # syn-serde => Serialize/Deserialize for AST types
-syn = { version = "2.0", features = ["full", "parsing", "extra-traits"] }
+syn = { version = "2.0", features = ["full", "parsing", "extra-traits", "visit"] }
 syn-serde  = { version = "0.3", features = ["json"] }
 quote = "1.0"
 proc-macro2 = "1.0"
