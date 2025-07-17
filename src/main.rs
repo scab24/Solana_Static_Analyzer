@@ -1,9 +1,10 @@
-use anyhow::{Result, Context};
+use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 use std::fs;
-use log::{info, error, warn, debug, trace};
+use log::{info, error, warn, debug};
 use env_logger;
+use std::collections::HashMap;
 
 mod ast;
 mod analyzer;
@@ -23,9 +24,13 @@ struct Cli {
     #[arg(short, long)]
     output: Option<PathBuf>,
     
-    /// Severities to ignore (separated by commas: low,medium,high,critical)
+    /// Severities to ignore (separated by commas: low,medium,high,informational)
     #[arg(short, long)]
     ignore: Option<String>,
+    
+    /// Rule IDs to ignore (separated by commas)
+    #[arg(long)]
+    ignore_rules: Option<String>,
     
     /// Generate AST JSON along with the report
     #[arg(long)]
@@ -76,6 +81,13 @@ fn main() -> Result<()> {
         let mut options = analyzer::AnalysisOptions::default();
         options.generate_ast = args.ast;
         
+        // Set default rule types to include
+        options.include_rule_types = vec![
+            analyzer::RuleType::Solana,
+            analyzer::RuleType::Anchor,
+            analyzer::RuleType::General,
+        ];
+        
         if let Some(templates) = &args.templates {
             options.custom_templates_path = Some(templates.to_string_lossy().to_string());
         }
@@ -93,6 +105,13 @@ fn main() -> Result<()> {
             }
         }
         
+        if let Some(ignore_rules) = &args.ignore_rules {
+            // Parse rule IDs to ignore
+            for rule_id in ignore_rules.split(',') {
+                options.ignore_rules.push(rule_id.trim().to_string());
+            }
+        }
+        
         // Create analyzer and run analysis
         let analyzer = analyzer::create_analyzer_with_options(options);
         match analyzer.analyze_files(&results) {
@@ -100,8 +119,17 @@ fn main() -> Result<()> {
                 info!("Analysis completed: {} findings", analysis_result.findings.len());
                 
                 // Show summary of findings by severity
+                let mut severity_counts = HashMap::new();
                 for (severity, count) in &analysis_result.stats.findings_by_severity {
-                    info!("- {:?}: {}", severity, count);
+                    severity_counts.insert(severity, *count);
+                }
+                
+                // Display in order of severity (High to Informational)
+                for severity in &[analyzer::Severity::High, analyzer::Severity::Medium, 
+                                analyzer::Severity::Low, analyzer::Severity::Informational] {
+                    if let Some(count) = severity_counts.get(severity) {
+                        info!("- {:?}: {}", severity, count);
+                    }
                 }
                 
                 // Save results to file if specified
@@ -115,18 +143,38 @@ fn main() -> Result<()> {
                         info!("No vulnerabilities found");
                     } else {
                         info!("Found {} vulnerabilities:", analysis_result.findings.len());
-                        for (i, finding) in analysis_result.findings.iter().enumerate() {
-                            info!("{}. [{:?}] {} ({}:{})", 
-                                i + 1,
-                                finding.severity,
-                                finding.description,
-                                finding.location.file,
-                                finding.location.line
-                            );
-                            
-                            // Show code snippet if available
-                            if let Some(snippet) = &finding.code_snippet {
-                                debug!("Code: {}", snippet);
+                        
+                        // Group findings by severity for better readability
+                        let mut findings_by_severity = HashMap::new();
+                        for finding in &analysis_result.findings {
+                            findings_by_severity
+                                .entry(&finding.severity)
+                                .or_insert_with(Vec::new)
+                                .push(finding);
+                        }
+                        
+                        // Display findings in order of severity
+                        let mut index = 1;
+                        for severity in &[analyzer::Severity::High, analyzer::Severity::Medium, 
+                                        analyzer::Severity::Low, analyzer::Severity::Informational] {
+                            if let Some(findings) = findings_by_severity.get(severity) {
+                                info!("----- {:?} Severity Findings -----", severity);
+                                
+                                for finding in findings {
+                                    info!("{}.\t{} ({}:{})", 
+                                        index,
+                                        finding.description,
+                                        finding.location.file,
+                                        finding.location.line
+                                    );
+                                    
+                                    // Show code snippet if available
+                                    if let Some(snippet) = &finding.code_snippet {
+                                        debug!("    Code: {}", snippet);
+                                    }
+                                    
+                                    index += 1;
+                                }
                             }
                         }
                     }
