@@ -1,8 +1,8 @@
-use std::fmt;
 use log::{debug, trace};
-use syn::{File, Item, ItemFn, ItemStruct, ItemEnum, Expr, Stmt, Block};
-use syn::visit::{self, Visit};
+use std::fmt;
 use syn::spanned::Spanned;
+use syn::visit::{self, Visit};
+use syn::{Block, Expr, File, Item, ItemEnum, ItemFn, ItemStruct, Stmt};
 
 use crate::analyzer::{Finding, Location, Severity};
 
@@ -78,7 +78,7 @@ impl<'a> AstNode<'a> {
             name: None,
         }
     }
-    
+
     /// Create a new node from a function
     pub fn from_function(func: &'a ItemFn) -> Self {
         Self {
@@ -87,7 +87,7 @@ impl<'a> AstNode<'a> {
             name: Some(func.sig.ident.to_string()),
         }
     }
-    
+
     /// Create a new node from a struct
     pub fn from_struct(struct_item: &'a ItemStruct) -> Self {
         Self {
@@ -96,17 +96,17 @@ impl<'a> AstNode<'a> {
             name: Some(struct_item.ident.to_string()),
         }
     }
-    
+
     /// Get the node type
     pub fn node_type(&self) -> NodeType {
         self.node_type.clone()
     }
-    
+
     /// Get the node name (if exists)
     pub fn name(&self) -> String {
         self.name.clone().unwrap_or_else(|| "unnamed".to_string())
     }
-    
+
     /// Get a code snippet of the node
     pub fn snippet(&self) -> String {
         match &self.data {
@@ -118,7 +118,7 @@ impl<'a> AstNode<'a> {
             _ => "...".to_string(),
         }
     }
-    
+
     /// Convert the node to a location in the file
     pub fn location(&self, file_path: &str) -> Location {
         //@todo => convert span to line/column
@@ -143,19 +143,19 @@ impl<'a> AstQuery<'a> {
             results: vec![AstNode::from_file(ast)],
         }
     }
-    
+
     /// Create a new query from a node
     pub fn from_node(node: &AstNode<'a>) -> Self {
         Self {
             results: vec![node.clone()],
         }
     }
-    
+
     /// Filter functions
     pub fn functions(self) -> Self {
         debug!("Searching for functions");
         let mut new_results = Vec::new();
-        
+
         for node in self.results {
             match node.data {
                 NodeData::File(file) => {
@@ -166,20 +166,22 @@ impl<'a> AstQuery<'a> {
                             new_results.push(AstNode::from_function(func));
                         }
                     }
-                },
+                }
                 // Other cases as needed
                 _ => {}
             }
         }
-        
-        Self { results: new_results }
+
+        Self {
+            results: new_results,
+        }
     }
-    
+
     /// Filter structs
     pub fn structs(self) -> Self {
         debug!("Searching for structs");
         let mut new_results = Vec::new();
-        
+
         for node in self.results {
             match node.data {
                 NodeData::File(file) => {
@@ -190,20 +192,22 @@ impl<'a> AstQuery<'a> {
                             new_results.push(AstNode::from_struct(struct_item));
                         }
                     }
-                },
+                }
                 // Other cases as needed
                 _ => {}
             }
         }
-        
-        Self { results: new_results }
+
+        Self {
+            results: new_results,
+        }
     }
-    
+
     /// Filter by name
     pub fn with_name(self, name: &str) -> Self {
         debug!("Filtering by name: {}", name);
         let mut new_results = Vec::new();
-        
+
         for node in self.results {
             if let Some(node_name) = &node.name {
                 if node_name == name {
@@ -212,14 +216,16 @@ impl<'a> AstQuery<'a> {
                 }
             }
         }
-        
-        Self { results: new_results }
+
+        Self {
+            results: new_results,
+        }
     }
-    
+
     pub fn uses_unsafe(self) -> Self {
         debug!("Searching for unsafe code");
         let mut new_results = Vec::new();
-        
+
         for node in self.results {
             match node.data {
                 NodeData::Function(func) => {
@@ -227,7 +233,7 @@ impl<'a> AstQuery<'a> {
                         trace!("Found unsafe function: {}", func.sig.ident);
                         new_results.push(node);
                     }
-                },
+                }
                 NodeData::Block(block) => {
                     // Search for unsafe blocks
                     for stmt in &block.stmts {
@@ -237,93 +243,108 @@ impl<'a> AstQuery<'a> {
                             break;
                         }
                     }
-                },
+                }
                 // Other cases as needed
                 _ => {}
             }
         }
-        
-        Self { results: new_results }
+
+        Self {
+            results: new_results,
+        }
     }
-    
+
     /// Search for calls to a specific function
     pub fn calls_to(self, function_name: &str) -> Self {
         debug!("Searching for calls to: {}", function_name);
         let mut new_results = Vec::new();
-        
+
         // Implement logic to search for function calls
         //@todo
-        
-        Self { results: new_results }
+
+        Self {
+            results: new_results,
+        }
     }
-    
+
     /// Apply a custom predicate
-    pub fn filter<F>(self, predicate: F) -> Self 
-    where 
-        F: Fn(&AstNode<'a>) -> bool 
+    pub fn filter<F>(self, predicate: F) -> Self
+    where
+        F: Fn(&AstNode<'a>) -> bool,
     {
         debug!("Applying custom predicate");
-        let new_results = self.results.into_iter()
+        let new_results = self
+            .results
+            .into_iter()
             .filter(|node| predicate(node))
             .collect();
-        
-        Self { results: new_results }
+
+        Self {
+            results: new_results,
+        }
     }
-    
+
     /// Combine with another query (OR operator)
     pub fn or(mut self, other: Self) -> Self {
         debug!("Combining queries with OR");
         self.results.extend(other.results);
         self
     }
-    
+
     /// Combine with another query (AND operator)
     pub fn and(self, other: Self) -> Self {
         debug!("Combining queries with AND");
         let other_results = other.results;
-        
+
         // Simple implementation: keep only nodes that are in both queries
         // In a real implementation, this would be more sophisticated
-        let new_results = self.results.into_iter()
+        let new_results = self
+            .results
+            .into_iter()
             .filter(|node| other_results.contains(node))
             .collect();
-        
-        Self { results: new_results }
+
+        Self {
+            results: new_results,
+        }
     }
-    
+
     /// Negate the query (NOT operator)
     pub fn not(self) -> Self {
         debug!("Negating query");
         //@todo
-        Self { results: Vec::new() }
+        Self {
+            results: Vec::new(),
+        }
     }
-    
+
     /// Check if there are results
     pub fn exists(self) -> bool {
         !self.results.is_empty()
     }
-    
+
     /// Get the number of results
     pub fn count(self) -> usize {
         self.results.len()
     }
-    
+
     /// Collect the results
     pub fn collect(self) -> Vec<AstNode<'a>> {
         self.results
     }
-    
+
     /// Convert the results to findings
     pub fn to_findings(self, severity: Severity, message: &str, file_path: &str) -> Vec<Finding> {
         debug!("Converting {} results to findings", self.results.len());
-        
-        self.results.into_iter()
+
+        self.results
+            .into_iter()
             .map(|node| {
                 let description = match &node.name {
                     Some(name) => format!("{} in '{}'", message, name),
                     None => message.to_string(),
                 };
-                
+
                 Finding {
                     description,
                     severity: severity.clone(),

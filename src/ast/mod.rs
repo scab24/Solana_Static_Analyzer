@@ -1,13 +1,13 @@
-pub mod parser;
 pub mod json;
+pub mod parser;
 
-pub use parser::{parse_rust_file, parse_rust_code, process_directory};
+pub use parser::{parse_rust_code, parse_rust_file, process_directory};
 
 pub use json::ast_to_json;
 
+use anyhow::Result;
 use log::debug;
 use std::path::Path;
-use anyhow::Result;
 
 pub fn process_rust_file(path: &Path) -> Result<String> {
     debug!("Processing Rust file: {}", path.display());

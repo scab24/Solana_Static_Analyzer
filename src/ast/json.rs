@@ -1,6 +1,6 @@
 use anyhow::Result;
-use syn::File;
 use log::debug;
+use syn::File;
 
 /// Convert an AST to JSON
 pub fn ast_to_json(ast: &File) -> Result<String> {

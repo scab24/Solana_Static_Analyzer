@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use log::debug;
-use syn::{File, ItemStruct, Field, Attribute, Meta, MetaList};
-use syn::visit::{self, Visit};
+use std::sync::Arc;
 use syn::spanned::Spanned;
+use syn::visit::{self, Visit};
+use syn::{Attribute, Field, File, ItemStruct, Meta, MetaList};
 
-use crate::analyzer::{Finding, Severity, Location};
+use crate::analyzer::dsl::{AstNode, RuleBuilder};
 use crate::analyzer::engine::{Rule, RuleType};
-use crate::analyzer::dsl::{RuleBuilder, AstNode};
+use crate::analyzer::{Finding, Location, Severity};
 
 pub fn create_rule() -> Arc<dyn Rule> {
     RuleBuilder::new()
@@ -63,12 +63,12 @@ impl<'ast> Visit<'ast> for DuplicateMutableAccountsVisitor<'ast> {
         // Save the name of the current struct
         let struct_name = node.ident.to_string();
         self.current_struct = Some(struct_name.clone());
-        
+
         // Reset the state for the new struct
         self.has_accounts_derive = false;
         self.has_constraint = false;
         self.mutable_accounts.clear();
-        
+
         // Verify if the struct derives Accounts
         for attr in &node.attrs {
             let meta = attr.meta.clone();
@@ -89,12 +89,12 @@ impl<'ast> Visit<'ast> for DuplicateMutableAccountsVisitor<'ast> {
                 }
             }
         }
-        
+
         // If the structure derives Accounts, search for mutable fields
         if self.has_accounts_derive {
             // Verify if there are constraints at the field level
             let mut field_constraints = false;
-            
+
             for field in &node.fields {
                 // Verify if the field is mutable and if it has constraints
                 let mut has_field_constraint = false;
@@ -115,7 +115,7 @@ impl<'ast> Visit<'ast> for DuplicateMutableAccountsVisitor<'ast> {
                     }
                     false
                 });
-                
+
                 // If the field is mutable, add it to the list (unless it has constraints)
                 if is_mutable && !has_field_constraint {
                     if let Some(ident) = &field.ident {
@@ -123,32 +123,35 @@ impl<'ast> Visit<'ast> for DuplicateMutableAccountsVisitor<'ast> {
                     }
                 }
             }
-            
+
             // If there are at least 2 mutable accounts and no constraints (neither at struct level nor field level), report the issue
             if self.mutable_accounts.len() >= 2 && !self.has_constraint && !field_constraints {
                 let struct_name = self.current_struct.as_ref().unwrap();
-                
+
                 // Create a finding for each mutable account
                 for account in &self.mutable_accounts {
                     let description = format!(
                         "Multiple mutable accounts detected without proper constraints in struct '{}'. Account: '{}'",
                         struct_name, account
                     );
-                    
+
                     self.findings.push(Finding {
                         description,
                         severity: Severity::Medium,
                         location: Location {
-                            file: "file.rs".to_string(), 
-                            line: 0, 
-                            column: 0, 
+                            file: "file.rs".to_string(),
+                            line: 0,
+                            column: 0,
                         },
-                        code_snippet: Some(format!("struct {} {{ ... {} ... }}", struct_name, account)),
+                        code_snippet: Some(format!(
+                            "struct {} {{ ... {} ... }}",
+                            struct_name, account
+                        )),
                     });
                 }
             }
         }
-        
+
         visit::visit_item_struct(self, node);
     }
 }

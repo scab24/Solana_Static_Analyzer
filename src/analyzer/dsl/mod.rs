@@ -1,5 +1,5 @@
-pub mod query;
 pub mod builders;
+pub mod query;
 
-pub use query::{AstQuery, AstNode, NodeType, NodeData};
 pub use builders::RuleBuilder;
+pub use query::{AstNode, AstQuery, NodeData, NodeType};

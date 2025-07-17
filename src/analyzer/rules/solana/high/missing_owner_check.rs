@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use log::debug;
-use syn::{File, ItemStruct, Fields, Meta, MetaList};
-use syn::visit::{self, Visit};
+use std::sync::Arc;
 use syn::spanned::Spanned;
+use syn::visit::{self, Visit};
+use syn::{Fields, File, ItemStruct, Meta, MetaList};
 
-use crate::analyzer::{Finding, Severity, Location};
+use crate::analyzer::dsl::{AstNode, RuleBuilder};
 use crate::analyzer::engine::{Rule, RuleType};
-use crate::analyzer::dsl::{RuleBuilder, AstNode};
+use crate::analyzer::{Finding, Location, Severity};
 
 pub fn create_rule() -> Arc<dyn Rule> {
     RuleBuilder::new()
@@ -72,32 +72,36 @@ impl<'ast> Visit<'ast> for MissingOwnerCheckVisitor<'ast> {
                 false
             }
         });
-        
+
         if is_accounts_struct {
             debug!("Found Accounts structure: {}", node.ident);
-            
+
             // Verify the fields of the structure
             if let Fields::Named(named_fields) = &node.fields {
                 for field in &named_fields.named {
                     // Verify if it is a field of type Account or AccountInfo
                     let type_str = format!("{:?}", field.ty);
-                    let is_account = type_str.contains("Account") || type_str.contains("AccountInfo");
-                    
+                    let is_account =
+                        type_str.contains("Account") || type_str.contains("AccountInfo");
+
                     if is_account {
                         // Get the field name
-                        let field_name = field.ident.as_ref()
+                        let field_name = field
+                            .ident
+                            .as_ref()
                             .map(|i| i.to_string())
                             .unwrap_or_else(|| "unnamed".to_string());
-                        
+
                         // Verify if it has an attribute account with owner or address
                         let has_owner_check = field.attrs.iter().any(|attr| {
                             let meta = attr.meta.clone();
                             if let Meta::List(meta_list) = meta {
                                 if meta_list.path.is_ident("account") {
                                     let tokens_str = meta_list.tokens.to_string();
-                                    tokens_str.contains("owner") || 
-                                    tokens_str.contains("address") ||
-                                    tokens_str.contains("constraint") && tokens_str.contains("owner")
+                                    tokens_str.contains("owner")
+                                        || tokens_str.contains("address")
+                                        || tokens_str.contains("constraint")
+                                            && tokens_str.contains("owner")
                                 } else {
                                     false
                                 }
@@ -105,11 +109,11 @@ impl<'ast> Visit<'ast> for MissingOwnerCheckVisitor<'ast> {
                                 false
                             }
                         });
-                        
+
                         // If there is no owner check, report a finding
                         if !has_owner_check {
                             debug!("Field {} without owner check", field_name);
-                            
+
                             //@todo
                             // Create the finding with precise location information
                             let finding = Finding {
@@ -120,23 +124,22 @@ impl<'ast> Visit<'ast> for MissingOwnerCheckVisitor<'ast> {
                                 severity: Severity::High,
                                 location: Location {
                                     file: self.file_path.clone(),
-                                    line: 1,  
-                                    column: 1, 
+                                    line: 1,
+                                    column: 1,
                                 },
                                 code_snippet: Some(format!(
-                                    "struct {} {{ {} }}", 
-                                    node.ident,
-                                    field_name
+                                    "struct {} {{ {} }}",
+                                    node.ident, field_name
                                 )),
                             };
-                            
+
                             self.findings.push(finding);
                         }
                     }
                 }
             }
         }
-        
+
         // Continue visiting sub-structures
         visit::visit_item_struct(self, node);
     }

@@ -1,7 +1,7 @@
 pub mod solana;
 
-use crate::analyzer::engine::{Rule, RuleEngine};
 use crate::analyzer::Result;
+use crate::analyzer::engine::{Rule, RuleEngine};
 
 pub use solana::*;
 
@@ -9,7 +9,7 @@ pub use solana::*;
 pub fn register_builtin_rules(engine: &mut RuleEngine) -> Result<()> {
     // Register Solana rules
     register_solana_rules(engine)?;
-    
+
     Ok(())
 }
 
@@ -18,13 +18,13 @@ fn register_solana_rules(engine: &mut RuleEngine) -> Result<()> {
     // High severity rules
     engine.add_rule(solana::high::unsafe_code::create_rule());
     engine.add_rule(solana::high::missing_owner_check::create_rule());
-    
+
     // Medium severity rules
     engine.add_rule(solana::medium::duplicate_mutable_accounts::create_rule());
     engine.add_rule(solana::medium::division_by_zero::create_rule());
-    
+
     // Low severity rules
     engine.add_rule(solana::low::naming_convention::create_rule());
-    
+
     Ok(())
 }
