@@ -2,7 +2,7 @@ use log::{debug, trace};
 use std::fmt;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, File, Item, ItemEnum, ItemFn, ItemStruct, Stmt};
+use syn::{Block, Expr, File, Item, ItemEnum, ItemFn, ItemStruct, Stmt, Meta, Fields, Attribute};
 
 use crate::analyzer::{Finding, Location, Severity};
 
@@ -46,6 +46,8 @@ pub enum NodeData<'a> {
     File(&'a File),
     /// Function
     Function(&'a ItemFn),
+    /// Impl Function (function inside impl block)
+    ImplFunction(&'a syn::ImplItemFn),
     /// Struct
     Struct(&'a ItemStruct),
     /// Enum
@@ -88,6 +90,15 @@ impl<'a> AstNode<'a> {
         }
     }
 
+    /// Create a new node from an impl function
+    pub fn from_impl_function(func: &'a syn::ImplItemFn) -> Self {
+        Self {
+            node_type: NodeType::Function,
+            data: NodeData::ImplFunction(func),
+            name: Some(func.sig.ident.to_string()),
+        }
+    }
+
     /// Create a new node from a struct
     pub fn from_struct(struct_item: &'a ItemStruct) -> Self {
         Self {
@@ -111,6 +122,7 @@ impl<'a> AstNode<'a> {
     pub fn snippet(&self) -> String {
         match &self.data {
             NodeData::Function(func) => format!("fn {}(...)", func.sig.ident),
+            NodeData::ImplFunction(func) => format!("fn {}(...)", func.sig.ident),
             NodeData::Struct(struct_item) => format!("struct {}", struct_item.ident),
             NodeData::Enum(enum_item) => format!("enum {}", enum_item.ident),
             NodeData::Block(_) => "{ ... }".to_string(),
@@ -119,15 +131,17 @@ impl<'a> AstNode<'a> {
         }
     }
 
-    /// Convert the node to a location in the file
-    pub fn location(&self, file_path: &str) -> Location {
-        //@todo => convert span to line/column
-        Location {
+    /// Get the location of the node in the source file
+    pub fn location(&self, file_path: &str) -> crate::analyzer::Location {
+        // @todo => Implement proper span-to-location conversion when needed
+        crate::analyzer::Location {
             file: file_path.to_string(),
-            line: 0,
-            column: 0,
+            line: 1,
+            column: 1,
         }
     }
+
+
 }
 
 /// AST query
@@ -144,6 +158,13 @@ impl<'a> AstQuery<'a> {
         }
     }
 
+    /// Create a new query from a list of nodes
+    pub fn from_nodes(nodes: Vec<AstNode<'a>>) -> Self {
+        Self {
+            results: nodes,
+        }
+    }
+
     /// Create a new query from a node
     pub fn from_node(node: &AstNode<'a>) -> Self {
         Self {
@@ -151,23 +172,33 @@ impl<'a> AstQuery<'a> {
         }
     }
 
+    /// Returns a mutable reference to the results for internal use
+    pub(crate) fn results_mut(&mut self) -> &mut Vec<AstNode<'a>> {
+        &mut self.results
+    }
+
+    /// Returns the results of the query
+    pub fn results(&self) -> &[AstNode<'a>] {
+        &self.results
+    }
+
+    /// Returns the nodes found by the query (alias for results)
+    pub fn nodes(&self) -> &[AstNode<'a>] {
+        &self.results
+    }
+
     /// Filter functions
     pub fn functions(self) -> Self {
-        debug!("Searching for functions");
+        debug!("Searching for functions recursively in all modules");
         let mut new_results = Vec::new();
 
         for node in self.results {
             match node.data {
                 NodeData::File(file) => {
-                    // Search for functions in the file
-                    for item in &file.items {
-                        if let Item::Fn(func) = item {
-                            trace!("Found function: {}", func.sig.ident);
-                            new_results.push(AstNode::from_function(func));
-                        }
-                    }
+                    // Search for functions recursively in the file
+                    Self::extract_functions_recursive(&file.items, &mut new_results);
                 }
-                // Other cases as needed
+                // Other cases
                 _ => {}
             }
         }
@@ -193,7 +224,7 @@ impl<'a> AstQuery<'a> {
                         }
                     }
                 }
-                // Other cases as needed
+                // Other cases
                 _ => {}
             }
         }
@@ -234,6 +265,12 @@ impl<'a> AstQuery<'a> {
                         new_results.push(node);
                     }
                 }
+                NodeData::ImplFunction(func) => {
+                    if func.sig.unsafety.is_some() {
+                        trace!("Found unsafe impl function: {}", func.sig.ident);
+                        new_results.push(node);
+                    }
+                }
                 NodeData::Block(block) => {
                     // Search for unsafe blocks
                     for stmt in &block.stmts {
@@ -259,8 +296,50 @@ impl<'a> AstQuery<'a> {
         debug!("Searching for calls to: {}", function_name);
         let mut new_results = Vec::new();
 
-        // Implement logic to search for function calls
-        //@todo
+        for node in self.results {
+            match node.data {
+                NodeData::Function(func) => {
+                    // Create a visitor to search for function calls within this function
+                    let mut call_finder = CallFinder {
+                        target_function: function_name.to_string(),
+                        found: false,
+                    };
+                    call_finder.visit_item_fn(func);
+                    
+                    if call_finder.found {
+                        trace!("Found call to {} in function {}", function_name, func.sig.ident);
+                        new_results.push(node);
+                    }
+                }
+                NodeData::ImplFunction(func) => {
+                    // Create a visitor to search for function calls within this impl function
+                    let mut call_finder = CallFinder {
+                        target_function: function_name.to_string(),
+                        found: false,
+                    };
+                    call_finder.visit_impl_item_fn(func);
+                    
+                    if call_finder.found {
+                        trace!("Found call to {} in impl function {}", function_name, func.sig.ident);
+                        new_results.push(node);
+                    }
+                }
+                NodeData::Block(block) => {
+                    // Search for function calls in blocks
+                    let mut call_finder = CallFinder {
+                        target_function: function_name.to_string(),
+                        found: false,
+                    };
+                    call_finder.visit_block(block);
+                    
+                    if call_finder.found {
+                        trace!("Found call to {} in block", function_name);
+                        new_results.push(node);
+                    }
+                }
+                _ => {}
+            }
+        }
 
         Self {
             results: new_results,
@@ -296,8 +375,7 @@ impl<'a> AstQuery<'a> {
         debug!("Combining queries with AND");
         let other_results = other.results;
 
-        // Simple implementation: keep only nodes that are in both queries
-        // In a real implementation, this would be more sophisticated
+        // @todo => Simple implementation
         let new_results = self
             .results
             .into_iter()
@@ -311,8 +389,9 @@ impl<'a> AstQuery<'a> {
 
     /// Negate the query (NOT operator)
     pub fn not(self) -> Self {
-        debug!("Negating query");
-        //@todo
+        debug!("Negating query - returning empty result (placeholder implementation)");
+        // @todo => Implement proper negation logic
+
         Self {
             results: Vec::new(),
         }
@@ -353,5 +432,72 @@ impl<'a> AstQuery<'a> {
                 }
             })
             .collect()
+    }
+
+    /// Helper function to recursively extract functions from items (including nested modules)
+    fn extract_functions_recursive<'b>(items: &'b [syn::Item], results: &mut Vec<AstNode<'b>>) {
+        for item in items {
+            match item {
+                syn::Item::Fn(func) => {
+                    trace!("Found function: {}", func.sig.ident);
+                    results.push(AstNode::from_function(func));
+                }
+                syn::Item::Mod(module) => {
+                    debug!("Searching in module: {}", module.ident);
+                    // Check if module has inline content (not external file)
+                    if let Some((_, items)) = &module.content {
+                        // Recursively search in the module
+                        Self::extract_functions_recursive(items, results);
+                    }
+                }
+                syn::Item::Impl(impl_block) => {
+                    debug!("Searching in impl block");
+                    // Search for functions in impl blocks
+                    for impl_item in &impl_block.items {
+                        if let syn::ImplItem::Fn(func) = impl_item {
+                            trace!("Found impl function: {}", func.sig.ident);
+                            results.push(AstNode::from_impl_function(func));
+                        }
+                    }
+                }
+                _ => {
+                    // Other items (structs, enums..)
+                }
+            }
+        }
+    }
+}
+
+/// Helper visitor to find calls to specific functions
+struct CallFinder {
+    target_function: String,
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for CallFinder {
+    fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        // Check if this is a call to our target function
+        if let syn::Expr::Path(path) = &*call.func {
+            if let Some(ident) = path.path.get_ident() {
+                if ident.to_string() == self.target_function {
+                    self.found = true;
+                    trace!("Found call to target function: {}", self.target_function);
+                }
+            }
+        }
+        
+        // Continue visiting sub-expressions
+        visit::visit_expr_call(self, call);
+    }
+    
+    fn visit_expr_method_call(&mut self, method_call: &'ast syn::ExprMethodCall) {
+        // Check if this is a method call to our target function
+        if method_call.method.to_string() == self.target_function {
+            self.found = true;
+            trace!("Found method call to target function: {}", self.target_function);
+        }
+        
+        // Continue visiting sub-expressions
+        visit::visit_expr_method_call(self, method_call);
     }
 }
