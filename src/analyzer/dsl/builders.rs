@@ -3,10 +3,9 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use syn::File;
 
-use crate::analyzer::dsl::query::{AstNode, AstQuery};
-use crate::analyzer::engine::{Rule, RuleType, RustRule};
 use crate::analyzer::{Finding, Severity};
-use syn::__private::Span;
+use crate::analyzer::engine::{Rule, RuleType, RustRule};
+use crate::analyzer::dsl::query::AstQuery;
 
 /// Rule builder to facilitate the creation of static analysis rules
 ///
@@ -80,12 +79,56 @@ impl RuleBuilder {
         self
     }
 
-    /// Sets the rule query
+    /// Sets a visitor-based rule implementation
+    pub fn visitor_rule<F>(mut self, rule_fn: F) -> Self
+    where
+        F: Fn(&syn::File) -> Vec<crate::analyzer::Finding> + Send + Sync + 'static,
+    {
+        self.query_builder = Some(Box::new(rule_fn));
+        self
+    }
+
+    /// Sets a DSL-based rule implementation
+    pub fn dsl_rule<F>(mut self, rule_fn: F) -> Self
+    where
+        F: Fn(&syn::File, &str) -> Vec<crate::analyzer::Finding> + Send + Sync + 'static,
+    {
+        // Wrap the DSL rule to ignore the file_path parameter for now
+        self.query_builder = Some(Box::new(move |file| {
+            rule_fn(file, "<unknown>")
+        }));
+        self
+    }
+
+    /// Sets the query builder (function that analyzes the AST and returns findings)
     pub fn query<F>(mut self, query_builder: F) -> Self
     where
         F: Fn(&File) -> Vec<Finding> + Send + Sync + 'static,
     {
         self.query_builder = Some(Box::new(query_builder));
+        self
+    }
+
+    /// Sets a DSL-based query builder (function that returns AstQuery for more expressive queries)
+    /// This is the new, preferred way to define rules using the DSL
+    pub fn dsl_query<F>(mut self, dsl_builder: F) -> Self
+    where
+        F: Fn(&File) -> crate::analyzer::dsl::query::AstQuery + Send + Sync + 'static,
+    {
+        // Wrap the DSL builder to convert AstQuery to Vec<Finding>
+        let wrapped_builder = move |ast: &File| -> Vec<Finding> {
+            let query_result = dsl_builder(ast);
+            
+            // Convert AstQuery to findings using the rule's metadata
+            // For now, we use placeholder values - these will be filled from the rule context
+            query_result.to_findings(
+                crate::analyzer::Severity::Medium, // Will be overridden by rule's severity
+                "DSL rule finding", // Will be overridden by rule's description
+                "file.rs" // Will be replaced with actual file path
+            )
+        };
+        
+        self.query_builder = Some(Box::new(wrapped_builder));
         self
     }
 
