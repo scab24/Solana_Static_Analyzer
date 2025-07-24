@@ -12,32 +12,13 @@ pub fn create_rule() -> Arc<dyn Rule> {
         .severity(Severity::Medium)
         .title("Duplicate Mutable Accounts")
         .description("Detects when an Anchor instruction has multiple mutable accounts that could reference the same account")
-        .dsl_rule(|file, file_path| {
-            debug!("Analyzing AST for duplicate mutable accounts using DSL");
+        .dsl_query(|ast, _file_path, _span_extractor| {
+            debug!("Analyzing duplicate mutable accounts using DSL");
             
-            let vulnerable_structs = AstQuery::new(file)
+            AstQuery::new(ast)
                 .structs()
                 .derives_accounts()
-                .has_duplicate_mutable_accounts();
-            
-            let mut findings = Vec::new();
-            for node in vulnerable_structs.nodes() {
-                let location = node.location(file_path);
-                let finding = Finding {
-                    description: format!(
-                        "Struct '{}' has multiple mutable accounts without proper constraints. \
-                        This could allow the same account to be passed multiple times, \
-                        leading to unexpected behavior or vulnerabilities.",
-                        node.name()
-                    ),
-                    severity: Severity::Medium,
-                    location,
-                    code_snippet: Some(node.snippet()),
-                };
-                findings.push(finding);
-            }
-            
-            findings
+                .has_duplicate_mutable_accounts()
         })
         .build()
 }
