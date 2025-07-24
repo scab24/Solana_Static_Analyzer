@@ -2,7 +2,7 @@ use log::{debug, trace};
 use std::fmt;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, File, Item, ItemEnum, ItemFn, ItemStruct, Stmt, Meta, Fields, Attribute};
+use syn::{Block, Expr, File, Item, ItemEnum, ItemFn, ItemStruct, Stmt};
 
 use crate::analyzer::{Finding, Location, Severity};
 
@@ -131,17 +131,21 @@ impl<'a> AstNode<'a> {
         }
     }
 
-    /// Get the location of the node in the source file
-    pub fn location(&self, file_path: &str) -> crate::analyzer::Location {
-        // @todo => Implement proper span-to-location conversion when needed
-        crate::analyzer::Location {
-            file: file_path.to_string(),
-            line: 1,
-            column: 1,
+    /// Get the underlying AST node that implements Spanned for use with SpanExtractor
+    pub fn get_spanned_node(&self) -> Option<&dyn syn::spanned::Spanned> {
+        use syn::spanned::Spanned;
+        
+        match &self.data {
+            NodeData::Function(func) => Some(func as &dyn Spanned),
+            NodeData::ImplFunction(func) => Some(func as &dyn Spanned),
+            NodeData::Struct(struct_item) => Some(struct_item as &dyn Spanned),
+            NodeData::Enum(enum_item) => Some(enum_item as &dyn Spanned),
+            NodeData::Block(block) => Some(block as &dyn Spanned),
+            NodeData::Expression(expr) => Some(expr as &dyn Spanned),
+            NodeData::File(file) => Some(file as &dyn Spanned),
+            NodeData::Other => None,
         }
     }
-
-
 }
 
 /// AST query
@@ -184,7 +188,7 @@ impl<'a> AstQuery<'a> {
 
     /// Returns the nodes found by the query (alias for results)
     pub fn nodes(&self) -> &[AstNode<'a>] {
-        &self.results
+        self.results()
     }
 
     /// Filter functions
@@ -297,53 +301,41 @@ impl<'a> AstQuery<'a> {
         let mut new_results = Vec::new();
 
         for node in self.results {
-            match node.data {
+            let found_call = match node.data {
                 NodeData::Function(func) => {
-                    // Create a visitor to search for function calls within this function
-                    let mut call_finder = CallFinder {
-                        target_function: function_name.to_string(),
-                        found: false,
-                    };
-                    call_finder.visit_item_fn(func);
-                    
-                    if call_finder.found {
-                        trace!("Found call to {} in function {}", function_name, func.sig.ident);
-                        new_results.push(node);
-                    }
+                    Self::has_function_call(function_name, |finder| finder.visit_item_fn(func))
                 }
                 NodeData::ImplFunction(func) => {
-                    // Create a visitor to search for function calls within this impl function
-                    let mut call_finder = CallFinder {
-                        target_function: function_name.to_string(),
-                        found: false,
-                    };
-                    call_finder.visit_impl_item_fn(func);
-                    
-                    if call_finder.found {
-                        trace!("Found call to {} in impl function {}", function_name, func.sig.ident);
-                        new_results.push(node);
-                    }
+                    Self::has_function_call(function_name, |finder| finder.visit_impl_item_fn(func))
                 }
                 NodeData::Block(block) => {
-                    // Search for function calls in blocks
-                    let mut call_finder = CallFinder {
-                        target_function: function_name.to_string(),
-                        found: false,
-                    };
-                    call_finder.visit_block(block);
-                    
-                    if call_finder.found {
-                        trace!("Found call to {} in block", function_name);
-                        new_results.push(node);
-                    }
+                    Self::has_function_call(function_name, |finder| finder.visit_block(block))
                 }
-                _ => {}
+                _ => false,
+            };
+
+            if found_call {
+                trace!("Found call to {} in {}", function_name, node.name());
+                new_results.push(node);
             }
         }
 
         Self {
             results: new_results,
         }
+    }
+
+    /// Helper function to check if a function call exists
+    fn has_function_call<F>(function_name: &str, visit_fn: F) -> bool
+    where
+        F: FnOnce(&mut CallFinder),
+    {
+        let mut call_finder = CallFinder {
+            target_function: function_name.to_string(),
+            found: false,
+        };
+        visit_fn(&mut call_finder);
+        call_finder.found
     }
 
     /// Apply a custom predicate
@@ -427,11 +419,69 @@ impl<'a> AstQuery<'a> {
                 Finding {
                     description,
                     severity: severity.clone(),
-                    location: node.location(file_path),
+                    location: Self::create_fallback_location(file_path),
                     code_snippet: Some(node.snippet()),
                 }
             })
             .collect()
+    }
+
+    /// Convert query results to findings with precise locations using SpanExtractor
+    /// This is the preferred method for dsl_query rules
+    pub fn to_findings_with_span_extractor(
+        self, 
+        severity: Severity, 
+        title: &str,
+        description: &str,
+        file_path: &str,
+        span_extractor: &crate::analyzer::span_utils::SpanExtractor
+    ) -> Vec<Finding> {
+        debug!("Converting {} results to findings with precise locations", self.results.len());
+
+        self.results
+            .into_iter()
+            .map(|node| {
+                // Use SpanExtractor for precise location and snippet
+                let (location, code_snippet) = if let Some(spanned_node) = node.get_spanned_node() {
+                    (
+                        span_extractor.extract_location(spanned_node),
+                        span_extractor.extract_snippet(spanned_node)
+                    )
+                } else {
+                    // Fallback for nodes without span info
+                    (Self::create_fallback_location(file_path), node.snippet())
+                };
+
+                // Create descriptive message based on node name
+                let finding_description = match &node.name {
+                    Some(name) => format!(
+                        "{} in '{}'. {}", 
+                        title, 
+                        name, 
+                        description
+                    ),
+                    None => format!("{}: {}", title, description),
+                };
+
+                Finding {
+                    description: finding_description,
+                    severity: severity.clone(),
+                    location,
+                    code_snippet: Some(code_snippet),
+                }
+            })
+            .collect()
+    }
+
+    /// Helper function to create a fallback location for nodes without span info
+    fn create_fallback_location(file_path: &str) -> crate::analyzer::Location {
+        crate::analyzer::Location {
+            file: file_path.to_string(),
+            line: 1,
+            column: None,
+            end_line: None,
+            end_column: None,
+        }
     }
 
     /// Helper function to recursively extract functions from items (including nested modules)

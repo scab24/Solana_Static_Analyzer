@@ -23,8 +23,8 @@ pub struct RuleBuilder {
     severity: Severity,
     /// Rule type
     rule_type: RuleType,
-    /// Query builder
-    query_builder: Option<Box<dyn Fn(&File) -> Vec<Finding> + Send + Sync>>,
+    /// Query builder with SpanExtractor support
+    query_builder: Option<Box<dyn Fn(&File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Vec<Finding> + Send + Sync>>,
     /// References to documentation or additional resources
     references: Vec<String>,
     /// Tags to classify the rule
@@ -82,20 +82,21 @@ impl RuleBuilder {
     /// Sets a visitor-based rule implementation
     pub fn visitor_rule<F>(mut self, rule_fn: F) -> Self
     where
-        F: Fn(&syn::File) -> Vec<crate::analyzer::Finding> + Send + Sync + 'static,
+        F: Fn(&syn::File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Vec<crate::analyzer::Finding> + Send + Sync + 'static,
     {
         self.query_builder = Some(Box::new(rule_fn));
         self
     }
 
-    /// Sets a DSL-based rule implementation
+    /// Sets a DSL-based rule implementation with SpanExtractor for precise locations
     pub fn dsl_rule<F>(mut self, rule_fn: F) -> Self
     where
-        F: Fn(&syn::File, &str) -> Vec<crate::analyzer::Finding> + Send + Sync + 'static,
+        F: Fn(&syn::File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Vec<crate::analyzer::Finding> + Send + Sync + 'static,
     {
-        // Wrap the DSL rule to ignore the file_path parameter for now
-        self.query_builder = Some(Box::new(move |file| {
-            rule_fn(file, "<unknown>")
+        // Store the rule function that expects SpanExtractor
+        // The SpanExtractor will be provided when the rule is executed
+        self.query_builder = Some(Box::new(move |file, file_path, span_extractor| {
+            rule_fn(file, file_path, span_extractor)
         }));
         self
     }
@@ -103,7 +104,7 @@ impl RuleBuilder {
     /// Sets the query builder (function that analyzes the AST and returns findings)
     pub fn query<F>(mut self, query_builder: F) -> Self
     where
-        F: Fn(&File) -> Vec<Finding> + Send + Sync + 'static,
+        F: Fn(&File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Vec<Finding> + Send + Sync + 'static,
     {
         self.query_builder = Some(Box::new(query_builder));
         self
@@ -113,18 +114,24 @@ impl RuleBuilder {
     /// This is the new, preferred way to define rules using the DSL
     pub fn dsl_query<F>(mut self, dsl_builder: F) -> Self
     where
-        F: Fn(&File) -> crate::analyzer::dsl::query::AstQuery + Send + Sync + 'static,
+        F: for<'a> Fn(&'a File, &'a str, &'a crate::analyzer::span_utils::SpanExtractor) -> crate::analyzer::dsl::query::AstQuery<'a> + Send + Sync + 'static,
     {
+        // Capture rule metadata for use in the wrapped builder
+        let rule_severity = self.severity.clone();
+        let rule_title = self.title.clone();
+        let rule_description = self.description.clone();
+        
         // Wrap the DSL builder to convert AstQuery to Vec<Finding>
-        let wrapped_builder = move |ast: &File| -> Vec<Finding> {
-            let query_result = dsl_builder(ast);
+        let wrapped_builder = move |ast: &File, file_path: &str, span_extractor: &crate::analyzer::span_utils::SpanExtractor| -> Vec<Finding> {
+            let query_result = dsl_builder(ast, file_path, span_extractor);
             
-            // Convert AstQuery to findings using the rule's metadata
-            // For now, we use placeholder values - these will be filled from the rule context
-            query_result.to_findings(
-                crate::analyzer::Severity::Medium, // Will be overridden by rule's severity
-                "DSL rule finding", // Will be overridden by rule's description
-                "file.rs" // Will be replaced with actual file path
+            // Convert AstQuery to findings using the rule's actual metadata
+            query_result.to_findings_with_span_extractor(
+                rule_severity.clone(),
+                &rule_title,
+                &rule_description,
+                file_path,
+                span_extractor
             )
         };
         
@@ -228,11 +235,11 @@ impl RuleBuilder {
             &description,
             severity,
             rule_type,
-            move |ast, file_path| {
+            move |ast, file_path, span_extractor| {
                 debug!("Executing rule {} in {}", id_clone, file_path);
 
-                // Execute the query and get findings directly
-                let findings = query_builder(ast);
+                // Execute the query with SpanExtractor and get findings directly
+                let findings = query_builder(ast, file_path, span_extractor);
 
                 // Only return findings if the rule is enabled
                 if enabled {
