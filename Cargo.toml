@@ -11,23 +11,26 @@ authors = ["secoalba <git.seco@protonmail.com>"]
 # parsing => parse Rust code as text
 # extra-traits => Debug, Eq traits for AST types
 # syn-serde => Serialize/Deserialize for AST types
-syn = { version = "2.0", features = ["full", "parsing", "extra-traits", "visit"] }
-syn-serde  = { version = "0.3", features = ["json"] }
-quote = "1.0"
-proc-macro2 = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits", "visit"] }
+syn-serde = { version = "0.3", features = ["json"] }
+log = "0.4"
+env_logger = "0.11.8"
+chrono = { version = "0.4", features = ["serde"] }
 
 # Serialization/Deserialization
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = "1.0.141"
 
 # CLI and error handling
 # clap => command line argument parsing
 # anyhow => error handling
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.5.41", features = ["derive"] }
 anyhow = "1.0"
 
 # File system utilities
 # walkdir => directory traversal
 walkdir = "2.3"
-log = "0.4"
-env_logger = "0.11.8"
+
+# Additional dependencies for AST processing
+quote = "1.0"
+proc-macro2 = { version = "1.0", features = ["span-locations"] }
