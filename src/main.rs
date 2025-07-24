@@ -143,9 +143,27 @@ fn main() -> Result<()> {
 
                 // Save results to file if specified
                 if let Some(output_path) = &args.output {
-                    // TODO: Implement report generation
-                    // For now, just show a message
-                    info!("Report would be saved to: {}", output_path.display());
+                    let report_generator = analyzer::reporting::ReportGenerator::new(
+                        analysis_result.findings.clone(),
+                        args.path.to_string_lossy().to_string(),
+                    );
+                    
+                    let output_str = output_path.to_string_lossy();
+                    if output_str.ends_with(".md") || output_str.ends_with(".markdown") {
+                        // Generate Markdown report
+                        match report_generator.save_markdown_report(&output_str) {
+                            Ok(()) => info!("📄 Markdown report saved to: {}", output_path.display()),
+                            Err(e) => error!("Failed to save report: {}", e),
+                        }
+                    } else {
+                        // Default to Markdown with .md extension
+                        let mut md_path = output_path.clone();
+                        md_path.set_extension("md");
+                        match report_generator.save_markdown_report(&md_path.to_string_lossy()) {
+                            Ok(()) => info!("📄 Markdown report saved to: {}", md_path.display()),
+                            Err(e) => error!("Failed to save report: {}", e),
+                        }
+                    }
                 } else {
                     // Show findings in the console using logs
                     if analysis_result.findings.is_empty() {

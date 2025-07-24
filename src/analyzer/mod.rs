@@ -2,6 +2,8 @@
 pub mod dsl;
 pub mod engine;
 pub mod rules;
+pub mod reporting;
+pub mod span_utils;
 
 // Standard imports
 use anyhow::Context;
@@ -33,7 +35,11 @@ pub struct Location {
     /// Line number (1-indexed)
     pub line: usize,
     /// Column number (1-indexed)
-    pub column: usize,
+    pub column: Option<usize>,
+    /// End line number (1-indexed)
+    pub end_line: Option<usize>,
+    /// End column number (1-indexed)
+    pub end_column: Option<usize>,
 }
 
 /// Finding of a vulnerability
@@ -56,6 +62,16 @@ pub use engine::{
     Rule, RuleEngine, RuleEngineConfig, RuleType, create_rule_engine,
     create_rule_engine_with_config,
 };
+
+/// Creates an analyzer with default options
+pub fn create_analyzer() -> Analyzer {
+    Analyzer::new()
+}
+
+/// Creates an analyzer with custom options
+pub fn create_analyzer_with_options(options: AnalysisOptions) -> Analyzer {
+    Analyzer::with_options(options)
+}
 
 /// Result of an analysis
 #[derive(Debug)]
@@ -158,10 +174,14 @@ impl Analyzer {
     pub fn analyze_file(&self, file_path: &str, ast: &File) -> Result<Vec<Finding>> {
         debug!("Analyzing file: {}", file_path);
 
-        // Execute rules on the AST
+        // Read source code for precise locations
+        let source_code = std::fs::read_to_string(file_path)
+            .with_context(|| format!("Failed to read source code from {}", file_path))?;
+
+        // Execute rules on the AST with source code for precise locations
         let findings = self
             .rule_engine
-            .execute_rules(ast, file_path)
+            .execute_rules(ast, file_path, &source_code)
             .with_context(|| format!("Failed to execute rules on {}", file_path))?;
 
         debug!("Found {} issues in {}", findings.len(), file_path);
@@ -215,14 +235,4 @@ impl Analyzer {
             stats,
         })
     }
-}
-
-/// Creates an analyzer with default options
-pub fn create_analyzer() -> Analyzer {
-    Analyzer::new()
-}
-
-/// Creates an analyzer with custom options
-pub fn create_analyzer_with_options(options: AnalysisOptions) -> Analyzer {
-    Analyzer::with_options(options)
 }
