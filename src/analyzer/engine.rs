@@ -37,8 +37,15 @@ pub trait Rule: Send + Sync {
     /// Returns the type of the rule
     fn rule_type(&self) -> RuleType;
 
-    /// Checks if the rule applies to the given AST
-    fn check(&self, ast: &File, file_path: &str) -> Result<Vec<Finding>>;
+    /// Execute the rule on the given AST and return findings
+    fn execute(&self, ast: &File, file_path: &str) -> Result<Vec<Finding>>;
+
+    /// Execute the rule on the given AST with source code for precise locations
+    fn execute_with_source(&self, ast: &File, file_path: &str, source_code: &str) -> Result<Vec<Finding>> {
+        // Default implementation falls back to the old method
+        // Rules that need precise locations should override this method
+        self.execute(ast, file_path)
+    }
 }
 
 /// Configuration for the rule engine
@@ -152,14 +159,14 @@ impl RuleEngine {
         self.rules.len()
     }
 
-    /// Executes all rules on the given AST
-    pub fn execute_rules(&self, ast: &File, file_path: &str) -> Result<Vec<Finding>> {
+    /// Execute all registered rules on the given AST with source code for precise locations
+    pub fn execute_rules(&self, ast: &File, file_path: &str, source_code: &str) -> anyhow::Result<Vec<Finding>> {
         debug!("Executing {} rules on {}", self.rules.len(), file_path);
 
         let mut findings = Vec::new();
 
         for rule in &self.rules {
-            match rule.check(ast, file_path) {
+            match rule.execute_with_source(ast, file_path, source_code) {
                 Ok(rule_findings) => {
                     debug!("Rule {} found {} issues", rule.id(), rule_findings.len());
                     findings.extend(rule_findings);
@@ -190,8 +197,8 @@ pub struct RustRule {
     /// Type of the rule
     rule_type: RuleType,
 
-    /// Function that implements the rule check
-    check_fn: Box<dyn Fn(&File, &str) -> Result<Vec<Finding>> + Send + Sync>,
+    /// Function that implements the rule check with SpanExtractor support
+    check_fn: Box<dyn Fn(&File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Result<Vec<Finding>> + Send + Sync>,
 }
 
 impl RustRule {
@@ -205,7 +212,7 @@ impl RustRule {
         check_fn: F,
     ) -> Self
     where
-        F: Fn(&File, &str) -> Result<Vec<Finding>> + Send + Sync + 'static,
+        F: Fn(&File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Result<Vec<Finding>> + Send + Sync + 'static,
     {
         Self {
             id: id.to_string(),
@@ -239,8 +246,16 @@ impl Rule for RustRule {
         self.rule_type.clone()
     }
 
-    fn check(&self, ast: &File, file_path: &str) -> Result<Vec<Finding>> {
-        (self.check_fn)(ast, file_path)
+    fn execute(&self, ast: &File, file_path: &str) -> Result<Vec<Finding>> {
+        // Fallback: create SpanExtractor with empty source for backward compatibility
+        let span_extractor = crate::analyzer::span_utils::SpanExtractor::new("".to_string(), file_path.to_string());
+        (self.check_fn)(ast, file_path, &span_extractor)
+    }
+
+    fn execute_with_source(&self, ast: &File, file_path: &str, source_code: &str) -> Result<Vec<Finding>> {
+        // Create SpanExtractor with actual source code for precise locations
+        let span_extractor = crate::analyzer::span_utils::SpanExtractor::new(source_code.to_string(), file_path.to_string());
+        (self.check_fn)(ast, file_path, &span_extractor)
     }
 }
 
