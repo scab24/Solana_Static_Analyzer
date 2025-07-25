@@ -4,7 +4,6 @@ use std::path::Path;
 
 use crate::analyzer::{Finding, Severity};
 
-/// Generates comprehensive reports from analysis findings (Aderyn style)
 pub struct ReportGenerator {
     findings: Vec<Finding>,
     project_path: String,
@@ -18,7 +17,6 @@ impl ReportGenerator {
         }
     }
 
-    /// Generate a clean Markdown report following Aderyn's style
     pub fn generate_markdown_report(&self) -> String {
         let mut report = String::new();
         
