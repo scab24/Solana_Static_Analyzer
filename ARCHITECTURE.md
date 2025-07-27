@@ -49,21 +49,6 @@ flowchart TD
     
     %% Data Store
     AST --> SPAN_EXTRACTOR
-    
-    %% Styling
-    classDef inputLayer fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef coreLayer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef ruleLayer fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    classDef dslLayer fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef outputLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef dataLayer fill:#f1f8e9,stroke:#689f38,stroke-width:2px
-    
-    class USER,CLI,ARGS inputLayer
-    class ANALYZER,PARSER,ENGINE coreLayer
-    class REGISTRY,HIGH_RULES,MED_RULES,LOW_RULES ruleLayer
-    class DSL_CORE,QUERY_ENGINE,FILTER_ENGINE,BASIC_FILTERS,SOLANA_FILTERS,SPAN_EXTRACTOR dslLayer
-    class FINDINGS,POST_PROCESSOR,ENHANCED_FINDINGS,REPORTER,OUTPUT outputLayer
-    class AST dataLayer
 ```
 
 ## Execution Flow
@@ -128,17 +113,6 @@ flowchart LR
     
     %% Output
     PROCESSOR --> FINDINGS[Findings]
-    
-    %% Styling
-    classDef input fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
-    classDef basic fill:#e0f2f1,stroke:#00695c,stroke-width:2px
-    classDef solana fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
-    classDef output fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    
-    class AST,QUERY input
-    class BASIC,FUNCTIONS,STRUCTS,CALLS basic
-    class SOLANA,PUBLIC,ACCOUNTS,UNSAFE solana
-    class PROCESSOR,FINDINGS output
 ```
 
 ## Rule Creation Workflow
@@ -171,17 +145,6 @@ flowchart TD
     %% Output
     CONVERT --> RULE[Compiled Rule]
     RULE --> REGISTRY[Rule Registry]
-    
-    %% Styling
-    classDef config fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef dsl fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    classDef process fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef output fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    
-    class START,BUILDER,CONFIG,ID,TITLE,DESC,SEV config
-    class DSL,CHAIN,BASIC_F,SOLANA_F dsl
-    class PROCESS,CONVERT process
-    class RULE,REGISTRY output
 ```
 
 ## Data Processing Flow
@@ -216,17 +179,6 @@ flowchart TD
     %% Output
     FINDINGS --> FORMATTER[Report Formatter]
     FORMATTER --> REPORT[Final Report]
-    
-    %% Styling
-    classDef input fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
-    classDef process fill:#e0f2f1,stroke:#00695c,stroke-width:2px
-    classDef analysis fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
-    classDef output fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    
-    class SOURCE,PARSER,AST input
-    class EXTRACTOR,FUNCTIONS,STRUCTS,IMPLS process
-    class ANALYZER,SPAN_PROC,LOCATIONS,SNIPPETS,FINDINGS analysis
-    class FORMATTER,REPORT output
 ```
 
 ## Available Filters
@@ -261,17 +213,4 @@ flowchart LR
     %% Converters
     CONVERT --> C1[to_findings]
     CONVERT --> C2[to_findings_with_span_extractor]
-    
-    %% Styling
-    classDef category fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef basic fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    classDef solana fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef logical fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef convert fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    
-    class FILTERS category
-    class BASIC,B1,B2,B3,B4 basic
-    class SOLANA,S1,S2,S3,S4,S5,S6 solana
-    class LOGICAL,L1,L2,L3 logical
-    class CONVERT,C1,C2 convert
 ```
