@@ -13,41 +13,52 @@ flowchart TD
     ANALYZER --> PARSER[AST Parser]
     PARSER --> AST[(Abstract Syntax Tree)]
     
-    %% Rule Engine Layer
+    %% Modular Rule Engine
     ANALYZER --> ENGINE[Rule Engine]
-    ENGINE --> REGISTRY[Rule Registry]
+    ENGINE --> HIGH_MODS[High Severity Modules]
+    ENGINE --> MED_MODS[Medium Severity Modules] 
+    ENGINE --> LOW_MODS[Low Severity Modules]
     
-    %% Rule Categories
-    REGISTRY --> HIGH_RULES[High Severity Rules]
-    REGISTRY --> MED_RULES[Medium Severity Rules]
-    REGISTRY --> LOW_RULES[Low Severity Rules]
+    %% Example Rule Modules (one per category)
+    HIGH_MODS --> H_EXAMPLE[Rule Module Example]
+    MED_MODS --> M_EXAMPLE[Rule Module Example]
+    LOW_MODS --> L_EXAMPLE[Rule Module Example]
+    
+    H_EXAMPLE --> H_RULE[mod.rs]
+    H_EXAMPLE --> H_FILTER[filters.rs]
+    M_EXAMPLE --> M_RULE[mod.rs]
+    M_EXAMPLE --> M_FILTER[filters.rs]
+    L_EXAMPLE --> L_RULE[mod.rs]
+    L_EXAMPLE --> L_FILTER[filters.rs]
     
     %% DSL Processing
-    HIGH_RULES --> DSL_CORE[DSL Core]
-    MED_RULES --> DSL_CORE
-    LOW_RULES --> DSL_CORE
+    H_RULE --> DSL_CORE[DSL Core]
+    M_RULE --> DSL_CORE
+    L_RULE --> DSL_CORE
     
     DSL_CORE --> QUERY_ENGINE[Query Engine]
-    DSL_CORE --> FILTER_ENGINE[Filter Engine]
+    DSL_CORE --> GENERIC_FILTERS[Generic Filters]
     
     %% Analysis Components
-    QUERY_ENGINE --> BASIC_FILTERS[Basic Filters]
-    FILTER_ENGINE --> SOLANA_FILTERS[Solana Filters]
+    QUERY_ENGINE --> BASIC_OPS[Basic Operations]
+    GENERIC_FILTERS --> ANCHOR_OPS[Anchor Operations]
     
-    BASIC_FILTERS --> SPAN_EXTRACTOR[Span Extractor]
-    SOLANA_FILTERS --> SPAN_EXTRACTOR
+    BASIC_OPS --> SPAN_EXTRACTOR[Span Extractor]
+    ANCHOR_OPS --> SPAN_EXTRACTOR
+    H_FILTER --> SPAN_EXTRACTOR
+    M_FILTER --> SPAN_EXTRACTOR
+    L_FILTER --> SPAN_EXTRACTOR
     
     %% Results Processing
     SPAN_EXTRACTOR --> FINDINGS[Raw Findings]
-    FINDINGS --> POST_PROCESSOR[Post Processor]
+    FINDINGS --> POST_PROCESSOR[Location Improver]
     POST_PROCESSOR --> ENHANCED_FINDINGS[Enhanced Findings]
     
     %% Output Layer
     ENHANCED_FINDINGS --> REPORTER[Report Generator]
-    REPORTER --> OUTPUT[Markdown Report]
+    REPORTER --> OUTPUT[Professional Report]
     OUTPUT --> USER
     
-    %% Data Store
     AST --> SPAN_EXTRACTOR
 ```
 
@@ -181,36 +192,39 @@ flowchart TD
     FORMATTER --> REPORT[Final Report]
 ```
 
-## Available Filters
+## Filter Architecture: Generic vs Rule-Specific
+
+The modular architecture separates filters into **generic DSL filters** (reusable) and **rule-specific filters** (encapsulated):
 
 ```mermaid
-flowchart LR
-    %% Filter Categories
-    FILTERS[DSL Filters] --> BASIC[Basic Filters]
-    FILTERS --> SOLANA[Solana Filters]
-    FILTERS --> LOGICAL[Logical Operations]
-    FILTERS --> CONVERT[Converters]
+flowchart TD
+    %% Filter Architecture
+    FILTERS[Filter System] --> GENERIC[Generic DSL Filters]
+    FILTERS --> SPECIFIC[Rule-Specific Filters]
     
-    %% Basic Filters
-    BASIC --> B1[functions]
-    BASIC --> B2[structs]
-    BASIC --> B3[calls_to]
-    BASIC --> B4[filter]
+    %% Generic DSL Filters (Reusable)
+    GENERIC --> G1[functions]
+    GENERIC --> G2[structs]
+    GENERIC --> G3[derives_accounts]
+    GENERIC --> G4[public_functions]
+    GENERIC --> G5[calls_to]
+    GENERIC --> G6[filter]
     
-    %% Solana Filters
-    SOLANA --> S1[derives_accounts]
-    SOLANA --> S2[public_functions]
-    SOLANA --> S3[missing_error_handling]
-    SOLANA --> S4[has_unsafe_divisions]
-    SOLANA --> S5[has_missing_signer_checks]
-    SOLANA --> S6[has_duplicate_mutable_accounts]
+    %% Rule-Specific Filters (Encapsulated)
+    SPECIFIC --> HIGH_EXAMPLE[High Severity Example]
+    SPECIFIC --> MED_EXAMPLE[Medium Severity Example]
+    SPECIFIC --> LOW_EXAMPLE[Low Severity Example]
     
-    %% Logical Operations
-    LOGICAL --> L1[and]
-    LOGICAL --> L2[or]
-    LOGICAL --> L3[not]
+    %% Technology Choice per Rule
+    HIGH_EXAMPLE --> ANCHOR_SYN[anchor-syn for semantic analysis]
+    MED_EXAMPLE --> SYN[syn for AST analysis]
+    LOW_EXAMPLE --> SYN_ALT[syn for AST analysis]
     
-    %% Converters
-    CONVERT --> C1[to_findings]
-    CONVERT --> C2[to_findings_with_span_extractor]
+    %% Generic filters are shared
+    G1 --> SHARED[Shared across all rules]
+    G2 --> SHARED
+    G3 --> SHARED
+    G4 --> SHARED
+    G5 --> SHARED
+    G6 --> SHARED
 ```
