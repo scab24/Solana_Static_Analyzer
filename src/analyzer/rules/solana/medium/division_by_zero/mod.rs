@@ -2,9 +2,11 @@ use log::debug;
 use std::sync::Arc;
 
 use crate::analyzer::dsl::{RuleBuilder, AstQuery};
-use crate::analyzer::dsl::filters::SolanaFilters;
-use crate::analyzer::engine::{Rule, RuleType};
-use crate::analyzer::{Finding, Location, Severity};
+use crate::analyzer::{Rule, Severity};
+
+// Import our specific filters
+mod filters;
+use filters::DivisionByZeroFilters;
 
 /// Crea la regla para detectar divisiones sin verificación de cero
 pub fn create_rule() -> Arc<dyn Rule> {
@@ -14,7 +16,7 @@ pub fn create_rule() -> Arc<dyn Rule> {
         .title("Division Without Zero Check")
         .description("Detects division operations without zero verification")
         .dsl_query(|ast, _file_path, _span_extractor| {
-            debug!("Analyzing unsafe divisions using DSL");
+            debug!("Analyzing unsafe divisions");
             
             AstQuery::new(ast)
                 .functions()

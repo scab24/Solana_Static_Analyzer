@@ -22,9 +22,11 @@ fn register_solana_rules(engine: &mut RuleEngine) -> Result<()> {
     // Medium severity rules
     engine.add_rule(solana::medium::duplicate_mutable_accounts::create_rule());
     engine.add_rule(solana::medium::division_by_zero::create_rule());
+    engine.add_rule(solana::medium::owner_check::create_rule());
 
     // Low severity rules
     engine.add_rule(solana::low::missing_error_handling::create_rule());
+    engine.add_rule(solana::low::anchor_instructions::create_rule());
 
     Ok(())
 }

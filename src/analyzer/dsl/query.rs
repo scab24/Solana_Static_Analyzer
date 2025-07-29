@@ -295,6 +295,65 @@ impl<'a> AstQuery<'a> {
         }
     }
 
+    /// Filter for structs that derive the Accounts trait
+    pub fn derives_accounts(self) -> Self {
+        debug!("Filtering structs that derive Accounts");
+        let mut new_results = Vec::new();
+        
+        for node in self.results {
+            if let NodeData::Struct(struct_item) = &node.data {
+                // Check if the struct derives Accounts
+                for attr in &struct_item.attrs {
+                    if let syn::Meta::List(meta_list) = &attr.meta {
+                        if meta_list.path.is_ident("derive") {
+                            let tokens_str = meta_list.tokens.to_string();
+                            if tokens_str.contains("Accounts") {
+                                trace!("Found struct deriving Accounts: {}", struct_item.ident);
+                                new_results.push(node);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Self {
+            results: new_results,
+        }
+    }
+
+    /// Filter for public functions only
+    pub fn public_functions(self) -> Self {
+        debug!("Filtering for public functions only");
+        
+        let mut new_results = Vec::new();
+        
+        for node in self.results {
+            match &node.data {
+                NodeData::Function(func) => {
+                    // Check if function has pub visibility
+                    if matches!(func.vis, syn::Visibility::Public(_)) {
+                        trace!("Found public function: {}", func.sig.ident);
+                        new_results.push(node);
+                    }
+                }
+                NodeData::ImplFunction(func) => {
+                    // Check if function has pub visibility
+                    if matches!(func.vis, syn::Visibility::Public(_)) {
+                        trace!("Found public impl function: {}", func.sig.ident);
+                        new_results.push(node);
+                    }
+                }
+                _ => {}
+            }
+        }
+        
+        Self {
+            results: new_results,
+        }
+    }
+
     /// Search for calls to a specific function
     pub fn calls_to(self, function_name: &str) -> Self {
         debug!("Searching for calls to: {}", function_name);
