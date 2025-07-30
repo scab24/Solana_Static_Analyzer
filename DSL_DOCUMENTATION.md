@@ -8,9 +8,8 @@ This comprehensive documentation explains how the Domain Specific Language (DSL)
 2. [SpanExtractor Integration](#spanextractor-integration)
 3. [File `query.rs` - DSL Core](#file-queryrs---dsl-core)
 4. [File `builders.rs` - Rule Builder](#file-buildersrs---rule-builder)
-5. [File `filters/solana.rs` - Specific Filters](#file-filterssolanars---specific-filters)
+5. [Modular Rule Filters - Specific Filters](#modular-rule-filters---specific-filters)
 6. [How to Write a New Rule](#how-to-write-a-new-rule)
-7. [Practical Examples](#practical-examples)
 
 ---
 
@@ -20,24 +19,26 @@ The analyzer's DSL consists of three main components:
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   query.rs      │    │   builders.rs   │    │ filters/solana  │
+│   query.rs      │    │   builders.rs   │    │ rules/[rule]/   │
 │                 │    │                 │    │                 │
-│ • AstQuery      │◄───┤ • RuleBuilder   │◄───┤ • Specific      │
-│ • AstNode       │    │ • Fluent API    │    │   Filters       │
-│ • NodeData      │    │ • Integration   │    │ • Solana        │
-│ • Operators     │    │                 │    │   Helpers       │
+│ • AstQuery      │◄───┤ • RuleBuilder   │◄───┤ • mod.rs        │
+│ • AstNode       │    │ • Fluent API    │    │ • filters.rs    │
+│ • NodeData      │    │ • Integration   │    │ • Specific      │
+│ • Generic       │    │                 │    │   Helpers       │
+│   Helpers       │    │                 │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
         ▲                       ▲                       ▲
         │                       │                       │
         └───────────────────────┼───────────────────────┘
                                 │
                     ┌─────────────────┐
+                    │   Modular       │
                     │ Vulnerability   │
-                    │    Rules       │
+                    │    Rules        │
                     │                 │
-                    │ • unsafe_code   │
-                    │ • division_zero │
-                    │ • missing_signer│
+                    │ high/unsafe_code│
+                    │ medium/division │
+                    │ low/error_handle│
                     └─────────────────┘
 ```
 
@@ -87,21 +88,18 @@ let extractor = SpanExtractor::new(
 #### `span_to_location(&self, span: Span) -> Location`
 ```rust
 let location = extractor.span_to_location(node_span);
-// Result: Location { file: "src/lib.rs", line: 42, column: Some(15), ... }
 ```
 **Usage**: Convert a `syn::Span` to precise `Location`.
 
 #### `extract_snippet(&self, spanned: &dyn Spanned) -> String`
 ```rust
 let snippet = extractor.extract_snippet(&function_node);
-// Result: "pub fn initialize(ctx: Context<Initialize>) -> Result<()>"
 ```
 **Usage**: Extract code snippet from any `Spanned` object.
 
 #### `extract_context(&self, span: Span, context_lines: usize) -> String`
 ```rust
 let context = extractor.extract_context(span, 2);
-// Result: Multi-line context with line numbers and highlighting
 ```
 **Usage**: Extract code with surrounding context lines.
 
@@ -655,189 +653,176 @@ pub fn create_unsafe_code_rule() -> Arc<dyn Rule> {
 
 ---
 
-## File `filters/solana.rs` - Specific Filters
+## Modular Rule Filters - Specific Filters
 
-This file extends the DSL with filters specific to the Solana/Anchor ecosystem.
+The analyzer uses a **modular architecture** where each vulnerability rule has its own specific filters. This approach provides better maintainability, scalability, and clarity compared to a centralized filter system.
 
-### Extension Trait
+### Architecture Overview
 
-#### `SolanaFilters<'a>` - Solana Filters
-```rust
-pub trait SolanaFilters<'a> {
-    // Filters for Anchor structures
-    fn derives_accounts(self) -> AstQuery<'a>;
-    fn has_duplicate_mutable_accounts(self) -> AstQuery<'a>;
-    fn has_missing_signer_checks(self) -> AstQuery<'a>;
-    fn has_owner_check(self) -> AstQuery<'a>;
-    
-    // Filters for functions
-    fn anchor_instructions(self) -> AstQuery<'a>;
-    fn has_unsafe_divisions(self) -> AstQuery<'a>;
-    fn public_functions(self) -> AstQuery<'a>;
-    fn missing_error_handling(self) -> AstQuery<'a>;
-}
+```
+src/analyzer/rules/solana/
+├── high/
+│   ├── unsafe_code/
+│   │   ├── mod.rs (rule implementation)
+│   │   └── filters.rs (specific filters)
+│   └── missing_signer_check/
+│       ├── mod.rs
+│       └── filters.rs
+├── medium/
+│   ├── division_by_zero/
+│   │   ├── mod.rs
+│   │   └── filters.rs
+│   └── duplicate_mutable_accounts/
+│       ├── mod.rs
+│       └── filters.rs
+└── low/
+    └── missing_error_handling/
+        ├── mod.rs
+        └── filters.rs
 ```
 
-### Filters for Anchor Structures
+### Generic Helpers (in `query.rs`)
 
-#### `derives_accounts()` - Detect Account Structures
+These are **generic helpers** available to all rules:
+
 ```rust
-let accounts = AstQuery::new(ast)
-    .structs()
-    .derives_accounts();  // Structures with #[derive(Accounts)]
+.functions()         // All functions
+.structs()          // All structures  
+.with_name(name)    // Filter by name
+.uses_unsafe()      // Functions/blocks with unsafe code
+.derives_accounts() // Structs with #[derive(Accounts)]
+.public_functions() // Only public functions
+.calls_to(name)     // Calls to specific function
+.filter(predicate)  // Custom predicate
+.or()/.and()/.not() // Logical operators
+.exists()/.count()  // Result queries
+.to_findings_with_span_extractor() // Convert to findings
 ```
 
-**Detects:**
-- Structures with `#[derive(Accounts)]`
-- Standard pattern for defining accounts in Anchor
+### Specific Filters (Modularized by Rule)
 
-#### `has_duplicate_mutable_accounts()` - Duplicate Mutable Accounts
+Each rule defines its own **specific filters** using trait extensions:
+
+#### Example: `unsafe_code/filters.rs`
 ```rust
-let vulnerable = AstQuery::new(ast)
-    .structs()
-    .derives_accounts()
-    .has_duplicate_mutable_accounts();
-```
+use crate::analyzer::dsl::query::AstQuery;
 
-**Detects:**
-- Multiple fields with `#[account(mut)]`
-- Potential to pass the same account multiple times
-- Common vulnerability in Anchor
-
-**Example of vulnerable code:**
-```rust
-#[derive(Accounts)]
-pub struct VulnerableAccounts {
-    #[account(mut)]
-    pub account1: Account<'info, MyAccount>,
-    #[account(mut)]  // ← Issue: multiple mut without constraints
-    pub account2: Account<'info, MyAccount>,
-}
-```
-
-#### `has_missing_signer_checks()` - Missing Signer Checks
-```rust
-let missing_signer = AstQuery::new(ast)
-    .structs()
-    .derives_accounts()
-    .has_missing_signer_checks();
-```
-
-**Detects:**
-- `authority` or `user` fields without `#[account(signer)]`
-- Accounts that should require a signature but don't
-
-**Example of vulnerable code:**
-```rust
-#[derive(Accounts)]
-pub struct TransferFunds {
-    pub authority: Signer<'info>,        // ✅ Correct
-    pub user: AccountInfo<'info>,        // ❌ Should be Signer
-}
-```
-
-### Filters for Functions
-
-#### `anchor_instructions()` - Anchor Instructions
-```rust
-let instructions = AstQuery::new(ast)
-    .functions()
-    .anchor_instructions();
-```
-
-**Detects:**
-- Public functions with `Context<...>` parameter
-- Standard Anchor instruction pattern
-- Works for both normal and impl functions
-
-**Example:**
-```rust
-pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-    // ← Detected as Anchor instruction
+pub trait UnsafeCodeFilters<'a> {
+    fn uses_unsafe(self) -> AstQuery<'a>;
 }
 
-impl MyProgram {
-    pub fn transfer(ctx: Context<Transfer>) -> Result<()> {
-        // ← Also detected (ImplFunction)
+impl<'a> UnsafeCodeFilters<'a> for AstQuery<'a> {
+    fn uses_unsafe(self) -> AstQuery<'a> {
+        // Implementation specific to unsafe code detection
+        self.filter(|node| {
+            // Custom logic for this vulnerability
+        })
     }
 }
 ```
 
-#### `has_unsafe_divisions()` - Unsafe Divisions
+#### Example: `duplicate_mutable_accounts/filters.rs`
 ```rust
-let unsafe_div = AstQuery::new(ast)
+use crate::analyzer::dsl::query::AstQuery;
+
+pub trait DuplicateMutableAccountsFilters<'a> {
+    fn has_duplicate_mutable_accounts(self) -> AstQuery<'a>;
+}
+
+impl<'a> DuplicateMutableAccountsFilters<'a> for AstQuery<'a> {
+    fn has_duplicate_mutable_accounts(self) -> AstQuery<'a> {
+        // Implementation specific to duplicate mutable accounts
+        self.filter(|node| {
+            // Custom logic for this vulnerability
+        })
+    }
+}
+```
+
+### Rule Implementation Pattern
+
+Each rule follows this **unified pattern**:
+
+```rust
+// In mod.rs of each rule
+use crate::analyzer::dsl::query::AstQuery;
+use crate::analyzer::dsl::builders::RuleBuilder;
+use crate::analyzer::{Rule, Severity};
+use std::sync::Arc;
+
+// Import the specific filters for this rule
+mod filters;
+use filters::SpecificFilters; // Trait name varies per rule
+
+pub fn create_rule() -> Arc<dyn Rule> {
+    RuleBuilder::new()
+        .id("solana-rule-name")
+        .title("Rule Title")
+        .description("Rule description")
+        .severity(Severity::High) // or Medium/Low
+        .dsl_query(|ast, file_path, span_extractor| {
+            AstQuery::new(ast)
+                .functions()                    // Generic helper
+                .specific_filter()              // Specific helper
+                .to_findings_with_span_extractor(
+                    Severity::High,
+                    "Rule Title",
+                    "Detailed description",
+                    file_path,
+                    span_extractor
+                )
+        })
+        .build()
+}
+```
+
+### Benefits of Modular Architecture
+
+1. **Maintainability**: Each vulnerability is self-contained
+2. **Scalability**: Easy to add new rules without affecting existing ones
+3. **Clarity**: Clear separation between generic and specific logic
+4. **Performance**: No unused filters loaded
+5. **Encapsulation**: Rule-specific logic stays with the rule
+
+### How to Create a New Rule
+
+1. **Create the directory structure:**
+   ```
+   src/analyzer/rules/solana/[severity]/[rule_name]/
+   ├── mod.rs
+   └── filters.rs
+   ```
+
+2. **Implement specific filters** in `filters.rs`
+3. **Implement the rule** in `mod.rs` using the pattern above
+4. **Register the rule** in the parent `mod.rs`
+
+### Real Examples from Current Codebase
+
+#### High Severity: `unsafe_code`
+```rust
+// Uses generic helper from query.rs
+AstQuery::new(ast)
     .functions()
-    .has_unsafe_divisions();
+    .uses_unsafe()  
 ```
 
-**Detects:**
-- Division operations (`/`, `%`) without zero checks
-- Uses visitor pattern to analyze expressions
-- Tracks safe variables (assigned to non-zero literals)
-
-**Internal Implementation:**
+#### Medium Severity: `duplicate_mutable_accounts`
 ```rust
-struct UnsafeDivisionFinder {
-    found: bool,
-    safe_variables: HashMap<String, bool>,  // Safe variables
-}
+// Uses specific filter from the rule's filters.rs
+AstQuery::new(ast)
+    .structs()
+    .derives_accounts()                    // Generic helper
+    .has_duplicate_mutable_accounts()      // Specific filter
 ```
 
-**Example of vulnerable code:**
+#### High Severity: `missing_signer_check`
 ```rust
-pub fn calculate_fee(amount: u64, divisor: u64) -> u64 {
-    amount / divisor  // ← Vulnerable: divisor could be 0
-}
-```
-
-**Example of safe code:**
-```rust
-pub fn calculate_fee(amount: u64, divisor: u64) -> u64 {
-    let safe_divisor = 100;  // ← Safe: non-zero literal
-    amount / safe_divisor
-}
-```
-
-#### `public_functions()` - Public Functions
-```rust
-let public_fns = AstQuery::new(ast)
-    .functions()
-    .public_functions();
-```
-
-**Detects:**
-- Functions with `pub` visibility
-- Both normal and impl functions
-- Useful for attack surface analysis
-
-#### `missing_error_handling()` - Missing Error Handling
-```rust
-let no_result = AstQuery::new(ast)
-    .functions()
-    .public_functions()
-    .missing_error_handling();
-```
-
-**Detects:**
-- Public functions that do NOT return `Result<T>`
-- Potential for silent failures
-- Especially important in Solana contracts
-
-**Example of vulnerable code:**
-```rust
-pub fn validate_account(account: &AccountInfo) {
-    // ← Issue: no Result return, silent failure
-    assert!(account.is_signer);
-}
-```
-
-**Example of correct code:**
-```rust
-pub fn validate_account(account: &AccountInfo) -> Result<()> {
-    // ← Correct: returns Result for explicit handling
-    require!(account.is_signer, ErrorCode::MissingSigner);
-    Ok(())
-}
+// Uses specific filter with anchor-syn for advanced analysis
+AstQuery::new(ast)
+    .structs()
+    .derives_accounts()                    // Generic helper
+    .has_missing_signer_checks()           // Specific filter
 ```
 
 ---
@@ -1027,174 +1012,3 @@ In `src/analyzer/rules/solana/mod.rs`:
 // In the register_builtin_rules function
 engine.register_rule(high::create_my_custom_rule());
 ```
-
-### Step 4: Test the Rule
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_my_custom_rule() {
-        let code = r#"
-            pub fn vulnerable_function() {
-                dangerous_function();  // ← Should detect this
-            }
-        "#;
-        
-        let ast = syn::parse_file(code).unwrap();
-        let rule = create_my_custom_rule();
-        let findings = rule.analyze(&ast, "test.rs").unwrap();
-        
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].severity, Severity::Medium);
-    }
-}
-```
-
----
-
-## Practical Examples
-
-### Example 1: Detect `unwrap()` Usage
-
-```rust
-pub fn create_unwrap_usage_rule() -> Arc<dyn Rule> {
-    RuleBuilder::new()
-        .id("solana-unwrap-usage")
-        .title("Dangerous unwrap() Usage")
-        .description("Using unwrap() can cause panics in Solana programs")
-        .severity(Severity::Medium)
-        .dsl_query(|ast: &syn::File, file_path: &str, span_extractor: &SpanExtractor| -> Vec<Finding> {
-            AstQuery::new(ast)
-                .functions()
-                .calls_to("unwrap")
-                .to_findings_with_span_extractor(
-                    Severity::Medium,
-                    "Dangerous unwrap() Usage",
-                    "Using unwrap() can cause panics in Solana programs. Use proper error handling with Result<T> instead.",
-                    file_path,
-                    span_extractor
-                )
-        })
-        .references(vec![
-            "https://docs.solana.com/developing/programming-model/overview#error-handling"
-        ])
-        .tags(vec!["error-handling", "panics"])
-        .build()
-}
-```
-
-### Example 2: Detect Missing Error Handling
-
-```rust
-pub fn create_missing_error_handling_rule() -> Arc<dyn Rule> {
-    RuleBuilder::new()
-        .id("solana-missing-error-handling")
-        .title("Missing Error Handling")
-        .description("Public functions should return Result<T> for proper error handling")
-        .severity(Severity::Low)
-        .dsl_query(|ast: &syn::File, file_path: &str, span_extractor: &SpanExtractor| -> Vec<Finding> {
-            AstQuery::new(ast)
-                .functions()
-                .public_functions()
-                .missing_error_handling()
-                .to_findings_with_span_extractor(
-                    Severity::Low,
-                    "Missing Error Handling",
-                    "Public functions should return Result<T> for proper error handling in Solana programs",
-                    file_path,
-                    span_extractor
-                )
-        })
-        .references(vec![
-            "https://docs.solana.com/developing/programming-model/overview#error-handling"
-        ])
-        .tags(vec!["error-handling", "best-practices"])
-        .build()
-}
-```
-
----
-
-## Best Practices
-
-### 1. Use `dsl_query()` with SpanExtractor
-- Always use `dsl_query()` with `to_findings_with_span_extractor()`
-- This provides precise locations, code snippets, and professional reporting
-- The SpanExtractor integration is built into the DSL workflow
-
-### 2. Consistent Naming
-```rust
-.id("solana-missing-signer-check")
-.title("Missing Signer Check")
-```
-**Guidelines**:
-- Use descriptive, kebab-case IDs with "solana-" prefix
-- Use clear, title-case titles that describe the vulnerability
-
-### 3. Appropriate Severities
-- **High**: Vulnerabilities that can cause loss of funds
-- **Medium**: Security issues requiring specific conditions
-- **Low**: Best practices and code quality issues
-
-### 4. Complete Documentation
-```rust
-.description("Detects functions that access account data without proper initialization checks. This can lead to reading uninitialized memory and potential security vulnerabilities.")
-.references(vec![
-    "https://docs.solana.com/developing/programming-model/accounts",
-    "https://github.com/coral-xyz/anchor/blob/master/lang/src/accounts/account.rs"
-])
-.tags(vec!["initialization", "memory-safety", "accounts"])
-```
-
-### 5. Proper Title and Description Format
-```rust
-.dsl_query(|ast, file_path, span_extractor| {
-    AstQuery::new(ast)
-        .functions()
-        .uses_unsafe()
-        .to_findings_with_span_extractor(
-            Severity::High,
-            "Unsafe Code Detection",
-            "Detects unsafe code blocks and functions that could lead to memory safety issues in Solana programs. Consider using safe alternatives or adding proper safety documentation.",
-            file_path,
-            span_extractor
-        )
-})
-```
-**Guidelines**:
-- Use clear, professional titles that describe the vulnerability type
-- Provide detailed descriptions that explain the issue and potential impact
-- Include recommendations or context when helpful
-
-### 6. Leverage Solana-Specific Filters
-```rust
-use crate::analyzer::dsl::filters::SolanaFilters;
-
-.dsl_query(|ast, file_path, span_extractor| {
-    AstQuery::new(ast)
-        .structs()
-        .derives_accounts()  // Solana-specific filter
-        .has_missing_signer_checks()  // Anchor-specific pattern
-        .to_findings_with_span_extractor(
-            Severity::High,
-            "Missing Signer Check",
-            "Anchor instruction struct lacks proper signer verification",
-            file_path,
-            span_extractor
-        )
-})
-```
-**Guidelines**:
-- Import and use `SolanaFilters` trait for Anchor-specific patterns
-- Combine multiple filters to create precise vulnerability detection
-- Use descriptive comments to explain the purpose of each filter
-
-### 7. Thorough Testing
-- Test positive cases (should detect)
-- Test negative cases (should not detect)
-- Test edge cases (boundaries)
-- Verify precise locations are correct
-- Check code snippets are meaningful
