@@ -4,7 +4,6 @@ use std::sync::Arc;
 use crate::analyzer::dsl::{RuleBuilder, AstQuery};
 use crate::analyzer::{Rule, Severity};
 
-// Import our specific filters
 mod filters;
 use filters::OwnerCheckFilters;
 
