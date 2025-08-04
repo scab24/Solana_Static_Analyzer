@@ -1,26 +1,32 @@
-use log::debug;
-use std::sync::Arc;
-
-use crate::analyzer::dsl::{RuleBuilder, AstQuery};
+use crate::analyzer::dsl::{AstQuery, RuleBuilder};
 use crate::analyzer::{Rule, Severity};
+use std::sync::Arc;
+use log::debug;
 
-// Import our specific filters
 mod filters;
-use filters::MissingSignerCheckFilters;
+
+#[cfg(test)]
+mod test;
 
 pub fn create_rule() -> Arc<dyn Rule> {
     RuleBuilder::new()
         .id("missing-signer-check")
-        .severity(Severity::High)
         .title("Missing Signer Check")
-        .description("Detects Anchor instructions that don't properly verify signer permissions")
-        .dsl_query(|ast, _file_path, _span_extractor| {
-            debug!("Analyzing missing signer checks");
+        .description("Detects Anchor account fields that may need signer verification")
+        .severity(Severity::High)
+        .dsl_query(|ast, file_path, span_extractor| {
+            debug!("Analyzing missing signer checks using DSL with specialized filters");
             
             AstQuery::new(ast)
                 .structs()
-                .derives_accounts()                    
-                .has_missing_signer_checks()           
+                .derives_accounts()
+                .filter(|node| {
+                    if let crate::analyzer::dsl::query::NodeData::Struct(item_struct) = &node.data {
+                        filters::has_missing_signer_checks(item_struct)
+                    } else {
+                        false
+                    }
+                })
         })
         .build()
 }
