@@ -4,27 +4,29 @@ use quote::{quote, ToTokens};
 use log::debug;
 use anchor_syn::{AccountsStruct, AccountField};
 use syn1;
+use std::path::Path;
 
 /// Filter for structs that have missing signer checks using anchor-syn
 pub fn has_missing_signer_checks(item_struct: &ItemStruct) -> bool {
     debug!("Checking struct '{}' for missing signer checks using anchor-syn", item_struct.ident);
     
-    // Convert syn2 ItemStruct to syn1 format for anchor-syn compatibility
-    match convert_to_anchor_struct(item_struct) {
+    if !is_accounts_struct(item_struct) {
+        debug!("Struct '{}' is not an Accounts struct, skipping", item_struct.ident);
+        return false;
+    }
+    
+    match convert_to_anchor_struct_optimized(item_struct) {
         Ok(accounts_struct) => {
             debug!("Successfully parsed AccountsStruct with {} fields", accounts_struct.fields.len());
             
-            // Analyze each field using the EXACT logic from the working implementation
             for anchor_field in &accounts_struct.fields {
-                // Use AccountField::Field pattern matching like in the working version
                 if let AccountField::Field(field) = anchor_field {
-                    // Check for vulnerable field types: AccountInfo, UncheckedAccount, SystemAccount
                     if matches!(
                         field.ty,
                         anchor_syn::Ty::AccountInfo | anchor_syn::Ty::UncheckedAccount | anchor_syn::Ty::SystemAccount
                     ) && !field.constraints.is_signer()
                     {
-                        debug!("Found vulnerable field that needs signer verification");
+                        debug!("Found vulnerable field '{}' that needs signer verification", field.ident);
                         return true;
                     }
                 }
@@ -32,23 +34,33 @@ pub fn has_missing_signer_checks(item_struct: &ItemStruct) -> bool {
             false
         },
         Err(e) => {
-            debug!("Failed to parse struct with anchor-syn: {}", e);
+            debug!("Failed to parse struct with anchor-syn: {}, using fallback", e);
             // Fallback to basic syn analysis
             has_missing_signer_checks_fallback(item_struct)
         }
     }
 }
 
-/// Convert syn2 ItemStruct to anchor-syn AccountsStruct
-fn convert_to_anchor_struct(item_struct: &ItemStruct) -> Result<AccountsStruct, String> {
-    let struct_tokens = quote::quote! { #item_struct };
-    let struct_str = struct_tokens.to_string();
+fn is_accounts_struct(item_struct: &ItemStruct) -> bool {
+    for attr in &item_struct.attrs {
+        if attr.path().is_ident("derive") {
+            let tokens = attr.meta.to_token_stream().to_string();
+            if tokens.contains("Accounts") {
+                debug!("Found Accounts derive on struct '{}'", item_struct.ident);
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn convert_to_anchor_struct_optimized(item_struct: &ItemStruct) -> Result<AccountsStruct, String> {
+    let struct_source = generate_clean_struct_source(item_struct);
     
-    debug!("Converting struct to string: {}", struct_str);
+    debug!("Generated clean struct source: {}", struct_source);
     
-    // Parse the string using syn1
-    let syn1_struct: syn1::ItemStruct = syn1::parse_str(&struct_str)
-        .map_err(|e| format!("Failed to parse struct string: {}\nSource: {}", e, struct_str))?;
+    let syn1_struct: syn1::ItemStruct = syn1::parse_str(&struct_source)
+        .map_err(|e| format!("Failed to parse clean struct source: {}\nSource: {}", e, struct_source))?;
     
     debug!("Successfully parsed syn1 struct with {} fields", 
            match &syn1_struct.fields {
@@ -65,6 +77,50 @@ fn convert_to_anchor_struct(item_struct: &ItemStruct) -> Result<AccountsStruct, 
     debug!("Successfully created AccountsStruct with {} fields", accounts_struct.fields.len());
     
     Ok(accounts_struct)
+}
+
+fn generate_clean_struct_source(item_struct: &ItemStruct) -> String {
+    let mut source = String::new();
+    for attr in &item_struct.attrs {
+        source.push_str(&format!("{}\n", quote!(#attr)));
+    }
+    
+    let vis = &item_struct.vis;
+    let ident = &item_struct.ident;
+    let generics = &item_struct.generics;
+    
+    source.push_str(&format!("{} struct {}{} ", quote!(#vis), ident, quote!(#generics)));
+    
+    match &item_struct.fields {
+        syn::Fields::Named(fields_named) => {
+            source.push_str("{\n");
+            for field in &fields_named.named {
+                
+                for attr in &field.attrs {
+                    source.push_str(&format!("    {}\n", quote!(#attr)));
+                }
+                
+                let vis = &field.vis;
+                let ident = field.ident.as_ref().unwrap();
+                let ty = &field.ty;
+                source.push_str(&format!("    {} {}: {},\n", quote!(#vis), ident, quote!(#ty)));
+            }
+            source.push_str("}\n");
+        },
+        syn::Fields::Unnamed(fields_unnamed) => {
+            source.push_str("(");
+            for (i, field) in fields_unnamed.unnamed.iter().enumerate() {
+                if i > 0 { source.push_str(", "); }
+                source.push_str(&quote!(#field.ty).to_string());
+            }
+            source.push_str(");\n");
+        },
+        syn::Fields::Unit => {
+            source.push_str(";\n");
+        }
+    }
+    
+    source
 }
 
 /// Fallback analysis using basic syn when anchor-syn fails
