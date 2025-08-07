@@ -187,7 +187,7 @@ impl ReportGenerator {
                 if findings.len() == 1 { "" } else { "s" }
             ));
             
-            for finding in findings {
+            for finding in &findings {
                 let display_location = finding.location.file.strip_prefix(&self.project_path)
                     .unwrap_or(&finding.location.file)
                     .trim_start_matches('/');
@@ -200,6 +200,17 @@ impl ReportGenerator {
                         section.push_str(&format!("\t{}\n", line));
                     }
                     section.push_str("\t```\n\n");
+                }
+            }
+            
+            // Recommendations
+            if let Some(first_finding) = findings.first() {
+                if !first_finding.recommendations.is_empty() {
+                    section.push_str("\n<details><summary>Recommendations</summary>\n\n");
+                    for (i, recommendation) in first_finding.recommendations.iter().enumerate() {
+                        section.push_str(&format!("{}. {}\n", i + 1, recommendation));
+                    }
+                    section.push_str("\n</details>\n");
                 }
             }
             

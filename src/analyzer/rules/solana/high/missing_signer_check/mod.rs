@@ -14,6 +14,13 @@ pub fn create_rule() -> Arc<dyn Rule> {
         .title("Missing Signer Check")
         .description("Detects Anchor account fields that may need signer verification")
         .severity(Severity::High)
+        .recommendations(vec![
+            "Add signer constraint to account fields that should be signed: #[account(signer)]",
+            "Use Signer<'info> type for accounts that must be signers of the transaction",
+            "Verify account ownership and signer status in instruction logic when needed",
+            "Consider using #[account(constraint = account.key() == signer.key())] for explicit signer validation",
+            "Review all account fields to ensure proper authorization and access control"
+        ])
         .dsl_query(|ast, file_path, span_extractor| {
             debug!("Analyzing missing signer checks using DSL with specialized filters");
             

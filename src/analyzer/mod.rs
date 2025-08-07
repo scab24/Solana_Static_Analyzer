@@ -53,6 +53,8 @@ pub struct Finding {
     pub location: Location,
     /// Code snippet containing the vulnerability (optional)
     pub code_snippet: Option<String>,
+    /// Recommendations for fixing the vulnerability
+    pub recommendations: Vec<String>,
 }
 
 /// Custom result type for analyzer operations

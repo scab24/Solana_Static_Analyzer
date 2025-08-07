@@ -37,6 +37,11 @@ pub trait Rule: Send + Sync {
     /// Returns the type of the rule
     fn rule_type(&self) -> RuleType;
 
+    /// Returns the recommendations for fixing the issue
+    fn recommendations(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     /// Execute the rule on the given AST and return findings
     fn execute(&self, ast: &File, file_path: &str) -> Result<Vec<Finding>>;
 
@@ -197,6 +202,9 @@ pub struct RustRule {
     /// Type of the rule
     rule_type: RuleType,
 
+    /// Recommendations for fixing the issue
+    recommendations: Vec<String>,
+
     /// Function that implements the rule check with SpanExtractor support
     check_fn: Box<dyn Fn(&File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Result<Vec<Finding>> + Send + Sync>,
 }
@@ -209,6 +217,7 @@ impl RustRule {
         description: &str,
         severity: Severity,
         rule_type: RuleType,
+        recommendations: Vec<String>,
         check_fn: F,
     ) -> Self
     where
@@ -220,6 +229,7 @@ impl RustRule {
             description: description.to_string(),
             severity,
             rule_type,
+            recommendations,
             check_fn: Box::new(check_fn),
         }
     }
@@ -244,6 +254,10 @@ impl Rule for RustRule {
 
     fn rule_type(&self) -> RuleType {
         self.rule_type.clone()
+    }
+
+    fn recommendations(&self) -> Vec<String> {
+        self.recommendations.clone()
     }
 
     fn execute(&self, ast: &File, file_path: &str) -> Result<Vec<Finding>> {

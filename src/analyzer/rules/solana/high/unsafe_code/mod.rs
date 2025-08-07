@@ -20,6 +20,11 @@ pub fn create_rule() -> Arc<dyn Rule> {
         .tag("unsafe")
         .reference(".")
         .reference("https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html")
+        .recommendations(vec![
+            "Avoid using unsafe code in Solana programs unless absolutely necessary",
+            "If unsafe is required, thoroughly document why it's needed and ensure all invariants are maintained",
+            "Consider using safe alternatives like checked arithmetic operations"
+        ])
         .dsl_query(|ast, _file_path, _span_extractor| {
             debug!("Analyzing unsafe code");
             

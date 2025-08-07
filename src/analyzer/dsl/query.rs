@@ -256,7 +256,7 @@ impl<'a> AstQuery<'a> {
             results: new_results,
         }
     }
-
+// @todo => delete this
     pub fn uses_unsafe(self) -> Self {
         debug!("Searching for unsafe code");
         let mut new_results = Vec::new();
@@ -464,7 +464,7 @@ impl<'a> AstQuery<'a> {
     }
 
     /// Convert the results to findings
-    pub fn to_findings(self, severity: Severity, message: &str, file_path: &str) -> Vec<Finding> {
+    pub fn to_findings(self, severity: Severity, message: &str, recommendations: &[String], file_path: &str) -> Vec<Finding> {
         debug!("Converting {} results to findings", self.results.len());
 
         self.results
@@ -480,6 +480,7 @@ impl<'a> AstQuery<'a> {
                     severity: severity.clone(),
                     location: Self::create_fallback_location(file_path),
                     code_snippet: Some(node.snippet()),
+                    recommendations: recommendations.to_vec(),
                 }
             })
             .collect()
@@ -492,6 +493,7 @@ impl<'a> AstQuery<'a> {
         severity: Severity, 
         title: &str,
         description: &str,
+        recommendations: &[String],
         file_path: &str,
         span_extractor: &crate::analyzer::span_utils::SpanExtractor
     ) -> Vec<Finding> {
@@ -527,6 +529,7 @@ impl<'a> AstQuery<'a> {
                     severity: severity.clone(),
                     location,
                     code_snippet: Some(code_snippet),
+                    recommendations: recommendations.to_vec(),
                 }
             })
             .collect()

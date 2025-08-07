@@ -14,6 +14,13 @@ pub fn create_rule() -> Arc<dyn Rule> {
         .severity(Severity::Low)
         .title("Anchor Instructions Detection")
         .description("Detects functions that are Anchor program instructions (public functions with Context parameter)")
+        .recommendations(vec![
+            "Ensure all instruction handlers return Result<()> for proper error handling",
+            "Add proper account validation using constraints in your Context struct",
+            "Consider adding access control checks at the beginning of instruction handlers",
+            "Use #[access_control] attribute for complex authorization logic",
+            "Document instruction parameters and expected account states"
+        ])
         .dsl_query(|ast, _file_path, _span_extractor| {
             debug!("Analyzing Anchor instructions");
             

@@ -27,6 +27,8 @@ pub struct RuleBuilder {
     query_builder: Option<Box<dyn Fn(&File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Vec<Finding> + Send + Sync>>,
     /// References to documentation or additional resources
     references: Vec<String>,
+    /// Recommendations for fixing the issue
+    recommendations: Vec<String>,
     /// Tags to classify the rule
     tags: Vec<String>,
     /// Indicates if the rule is enabled by default
@@ -44,6 +46,7 @@ impl RuleBuilder {
             rule_type: RuleType::Solana,
             query_builder: None,
             references: Vec::new(),
+            recommendations: Vec::new(),
             tags: Vec::new(),
             enabled: true,
         }
@@ -120,6 +123,7 @@ impl RuleBuilder {
         let rule_severity = self.severity.clone();
         let rule_title = self.title.clone();
         let rule_description = self.description.clone();
+        let rule_recommendations = self.recommendations.clone();
         
         // Wrap the DSL builder to convert AstQuery to Vec<Finding>
         let wrapped_builder = move |ast: &File, file_path: &str, span_extractor: &crate::analyzer::span_utils::SpanExtractor| -> Vec<Finding> {
@@ -130,6 +134,7 @@ impl RuleBuilder {
                 rule_severity.clone(),
                 &rule_title,
                 &rule_description,
+                &rule_recommendations,
                 file_path,
                 span_extractor
             )
@@ -180,6 +185,20 @@ impl RuleBuilder {
         self
     }
 
+    /// Adds a recommendation for fixing the issue
+    pub fn recommendation(mut self, recommendation: &str) -> Self {
+        self.recommendations.push(recommendation.to_string());
+        self
+    }
+
+    /// Adds multiple recommendations for fixing the issue
+    pub fn recommendations(mut self, recs: Vec<&str>) -> Self {
+        for recommendation in recs {
+            self.recommendations.push(recommendation.to_string());
+        }
+        self
+    }
+
     /// Adds a tag to classify the rule
     pub fn tag(mut self, tag: &str) -> Self {
         self.tags.push(tag.to_string());
@@ -207,6 +226,7 @@ impl RuleBuilder {
         // Verify that we have all the necessary components
         let query_builder = self.query_builder.expect("Query builder is required");
         let references = self.references;
+        let recommendations = self.recommendations;
         let tags = self.tags;
         let enabled = self.enabled;
         let id = self.id.clone();
@@ -235,6 +255,7 @@ impl RuleBuilder {
             &description,
             severity,
             rule_type,
+            recommendations,
             move |ast, file_path, span_extractor| {
                 debug!("Executing rule {} in {}", id_clone, file_path);
 
