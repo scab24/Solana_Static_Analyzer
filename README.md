@@ -2,7 +2,19 @@
 
 A powerful static analysis tool for Solana smart contracts written in Rust. Detect vulnerabilities, security issues, and code quality problems in your Solana/Anchor projects.
 
-
+<div style="display: flex; overflow-x: auto; gap: 10px;">
+    <img src="./image/slides/slide1.png" alt="Console Output Example" style="max-width: 500px;">
+    <img src="./image/slides/slide2.png" alt="Report Example" style="max-width: 500px;">
+    <img src="./image/slides/slide3.png" alt="AST Example" style="max-width: 500px;">
+    <img src="./image/slides/slide4.png" alt="Rule Configuration" style="max-width: 500px;">
+    <img src="./image/slides/slide5.png" alt="Custom DSL" style="max-width: 500px;">
+    <img src="./image/slides/slide6.png" alt="Custom DSL" style="max-width: 500px;">
+    <img src="./image/slides/slide7.png" alt="Custom DSL" style="max-width: 500px;">
+    <img src="./image/slides/slide8.png" alt="Custom DSL" style="max-width: 500px;">
+</div>
+<p style="text-align: center; margin-top: 10px;">
+    <a href="https://app.pitch.com/app/presentation/2683d6d1-a55f-4ade-8832-65c4eeb056d6/1f7fee25-021c-49d7-bc80-9b998da9a178/5281f95b-9671-4430-8745-eecebf8f9d6e" style="color: #007bff; text-decoration: none; font-weight: 500;">View Full Presentation on Pitch</a>
+</p>
 
 ## Installation
 
@@ -48,7 +60,7 @@ Environment Variables:
   RUST_LOG=info           Enable info logging
 ```
 
-<img width="900" alt="Console Output Example" src="./src/image/console.png">
+<img width="900" alt="Console Output Example" src="./image/console.png">
 
 ## Project Structure
 
@@ -151,8 +163,14 @@ cargo test
 - [Architecture Overview](ARCHITECTURE.md)
 - [DSL Documentation](DSL_DOCUMENTATION.md)
 
+<div style="display: flex; justify-content: center;">
+    <video controls width="900">
+        <source src="./image/video/Static_Analyzer.mp4">
+        Your browser does not support the video tag.
+    </video>
+</div>
+
 ## Support
 
 - X [ Twitter ](https://x.com/Seecoalba)
 - Email: git.seco@protonmail.com
-
