@@ -159,11 +159,14 @@ cargo test
 - [Architecture Overview](ARCHITECTURE.md)
 - [DSL Documentation](DSL_DOCUMENTATION.md)
 
-<div style="display: flex; justify-content: center;">
-    <video controls width="900">
-        <source src="./image/video/Static_Analyzer.mp4">
-        Your browser does not support the video tag.
-    </video>
+<div align="center">
+  <a href="https://drive.google.com/file/d/1sdrAYy67HIUFWMWg5-p-kKmIPPxDpeZ4/view?usp=sharing" target="_blank">
+    <img src="./image/video/video.png" alt="Ver video demo" style="width: 600px; height: 350px;"/>
+    <p style="color: #007bff; text-decoration: none; font-weight: 500; font-size: 1.1rem;">View video demo in Google Drive</p>
+    <a href="./image/video/Static_Analyzer.mp4" target="_blank">
+    <p style="color: #007bff; text-decoration: none; font-weight: 500; font-size: 1.1rem;">View video demo in local</p>
+    </a>
+  </a>
 </div>
 
 ## Support
