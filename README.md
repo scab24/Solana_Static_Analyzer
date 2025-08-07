@@ -6,6 +6,7 @@ A powerful static analysis tool for Solana smart contracts written in Rust. Dete
   <img src="./image/slides/slide1.png" alt="Console Output Example" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
   <p style="margin-top: 1rem;">
     <a href="https://app.pitch.com/app/presentation/2683d6d1-a55f-4ade-8832-65c4eeb056d6/1f7fee25-021c-49d7-bc80-9b998da9a178/5281f95b-9671-4430-8745-eecebf8f9d6e" 
+       target="_blank" rel="noopener noreferrer"
        style="color: #007bff; text-decoration: none; font-weight: 500; font-size: 1.1rem;">
       View Full Presentation on Pitch
     </a>
@@ -160,12 +161,9 @@ cargo test
 - [DSL Documentation](DSL_DOCUMENTATION.md)
 
 <div align="center">
-  <a href="https://drive.google.com/file/d/1sdrAYy67HIUFWMWg5-p-kKmIPPxDpeZ4/view?usp=sharing" target="_blank">
+  <a href="https://drive.google.com/file/d/1sdrAYy67HIUFWMWg5-p-kKmIPPxDpeZ4/view?usp=sharing" target="_blank" rel="noopener noreferrer">
     <img src="./image/video/video.png" alt="Ver video demo" style="width: 600px; height: 350px;"/>
     <p style="color: #007bff; text-decoration: none; font-weight: 500; font-size: 1.1rem;">View video demo in Google Drive</p>
-    <a href="./image/video/Static_Analyzer.mp4" target="_blank">
-    <p style="color: #007bff; text-decoration: none; font-weight: 500; font-size: 1.1rem;">View video demo in local</p>
-    </a>
   </a>
 </div>
 
