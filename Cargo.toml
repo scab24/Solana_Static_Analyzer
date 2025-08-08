@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Static analyzer for Solana/Anchor contracts in Rust"
 authors = ["secoalba <git.seco@protonmail.com>"]
+license = "AGPL-3.0-only"
 
 [dependencies]
 # Rust syntax analysis

@@ -171,3 +171,7 @@ cargo test
 
 - X [ Twitter ](https://x.com/Seecoalba)
 - Email: git.seco@protonmail.com
+
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only). See the [LICENSE](./LICENSE) file for details.
