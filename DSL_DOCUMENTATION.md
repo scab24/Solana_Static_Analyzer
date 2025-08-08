@@ -55,14 +55,13 @@ The analyzer's DSL consists of three main components:
 
 ## SpanExtractor Integration
 
-The analyzer now includes **precise location extraction** through the `SpanExtractor` system, which provides exact file locations and automatic code snippet generation for all vulnerability findings.
+The analyzer includes **precise location extraction** through the `SpanExtractor` system, which provides exact file locations and automatic code snippet generation for all vulnerability findings.
 
 ### Key Features
 
 #### **🎯 Precise Locations**
-- **Before**: Generic locations like `<unknown>:1`
-- **Now**: Exact locations like `src/lib.rs:42:15`
-- **Includes**: Line numbers, column positions, and end positions
+- Exact locations like `src/lib.rs:42:15`
+- Line numbers, column positions, and end positions
 
 #### **📝 Automatic Code Snippets**
 - **Function signatures**: `pub fn initialize(ctx: Context<Initialize>) -> Result<()>`
@@ -70,8 +69,8 @@ The analyzer now includes **precise location extraction** through the `SpanExtra
 - **Code context**: Surrounding lines for better understanding
 
 #### **🔗 AST Integration**
-- **`get_spanned_node()`**: New method to get `syn::spanned::Spanned` objects
-- **`to_findings_with_span_extractor()`**: **PREFERRED** method for creating findings
+- **`get_spanned_node()`**: Method to get `syn::spanned::Spanned` objects
+- **`to_findings_with_span_extractor()`**: Method for creating findings
 - **Automatic integration**: Works seamlessly with all DSL queries
 
 ### SpanExtractor Methods
