@@ -13,15 +13,15 @@ impl<'a> UnsafeCodeFilters<'a> for AstQuery<'a> {
         for node in self.results() {
             match node.data {
                 NodeData::Function(func) => {
-                    let has_unsafe = has_unsafe_in_block(&func.block);
-                    if has_unsafe {
+                    let uses_unsafe = func.sig.unsafety.is_some() || has_unsafe_in_block(&func.block);
+                    if uses_unsafe {
                         trace!("Found unsafe code in function: {}", func.sig.ident);
                         new_results.push(node.clone());
                     }
                 }
                 NodeData::ImplFunction(func) => {
-                    let has_unsafe = has_unsafe_in_block(&func.block);
-                    if has_unsafe {
+                    let uses_unsafe = func.sig.unsafety.is_some() || has_unsafe_in_block(&func.block);
+                    if uses_unsafe {
                         trace!("Found unsafe code in impl function: {}", func.sig.ident);
                         new_results.push(node.clone());
                     }
@@ -45,13 +45,6 @@ fn has_unsafe_in_block(block: &syn::Block) -> bool {
     impl<'ast> Visit<'ast> for UnsafeVisitor {
         fn visit_expr_unsafe(&mut self, _node: &'ast syn::ExprUnsafe) {
             self.found_unsafe = true;
-        }
-        
-        fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
-            if node.sig.unsafety.is_some() {
-                self.found_unsafe = true;
-            }
-            syn::visit::visit_item_fn(self, node);
         }
     }
     

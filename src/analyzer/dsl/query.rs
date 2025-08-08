@@ -232,7 +232,7 @@ impl<'a> AstQuery<'a> {
                 _ => {}
             }
         }
-
+        
         Self {
             results: new_results,
         }
@@ -249,44 +249,6 @@ impl<'a> AstQuery<'a> {
                     trace!("Found node with name: {}", name);
                     new_results.push(node);
                 }
-            }
-        }
-
-        Self {
-            results: new_results,
-        }
-    }
-// @todo => delete this
-    pub fn uses_unsafe(self) -> Self {
-        debug!("Searching for unsafe code");
-        let mut new_results = Vec::new();
-
-        for node in self.results {
-            match node.data {
-                NodeData::Function(func) => {
-                    if func.sig.unsafety.is_some() {
-                        trace!("Found unsafe function: {}", func.sig.ident);
-                        new_results.push(node);
-                    }
-                }
-                NodeData::ImplFunction(func) => {
-                    if func.sig.unsafety.is_some() {
-                        trace!("Found unsafe impl function: {}", func.sig.ident);
-                        new_results.push(node);
-                    }
-                }
-                NodeData::Block(block) => {
-                    // Search for unsafe blocks
-                    for stmt in &block.stmts {
-                        if let Stmt::Expr(Expr::Unsafe(_), _) = stmt {
-                            trace!("Found unsafe block");
-                            new_results.push(node);
-                            break;
-                        }
-                    }
-                }
-                // Other cases as needed
-                _ => {}
             }
         }
 
