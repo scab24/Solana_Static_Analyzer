@@ -59,16 +59,16 @@ The analyzer includes **precise location extraction** through the `SpanExtractor
 
 ### Key Features
 
-#### **🎯 Precise Locations**
+#### **Precise Locations**
 - Exact locations like `src/lib.rs:42:15`
 - Line numbers, column positions, and end positions
 
-#### **📝 Automatic Code Snippets**
+#### **Automatic Code Snippets**
 - **Function signatures**: `pub fn initialize(ctx: Context<Initialize>) -> Result<()>`
 - **Struct definitions**: `pub struct TransferFunds`
 - **Code context**: Surrounding lines for better understanding
 
-#### **🔗 AST Integration**
+#### **AST Integration**
 - **`get_spanned_node()`**: Method to get `syn::spanned::Spanned` objects
 - **`to_findings_with_span_extractor()`**: Method for creating findings
 - **Automatic integration**: Works seamlessly with all DSL queries
