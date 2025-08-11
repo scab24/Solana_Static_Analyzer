@@ -1,10 +1,9 @@
 use log::{debug, trace};
 use std::fmt;
-use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, File, Item, ItemEnum, ItemFn, ItemStruct, Stmt};
+use syn::{Block, Expr, File, Item, ItemEnum, ItemFn, ItemStruct};
 
-use crate::analyzer::{Finding, Location, Severity};
+use crate::analyzer::{Finding, Severity};
 
 /// Type of node in the AST
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,7 +130,7 @@ impl<'a> AstNode<'a> {
         }
     }
 
-    /// Get the underlying AST node that implements Spanned for use with SpanExtractor
+    /// Get the underlying AST node that implements Spanned for use with `SpanExtractor`
     pub fn get_spanned_node(&self) -> Option<&dyn syn::spanned::Spanned> {
         use syn::spanned::Spanned;
         
@@ -240,13 +239,13 @@ impl<'a> AstQuery<'a> {
 
     /// Filter by name
     pub fn with_name(self, name: &str) -> Self {
-        debug!("Filtering by name: {}", name);
+        debug!("Filtering by name: {name}");
         let mut new_results = Vec::new();
 
         for node in self.results {
             if let Some(node_name) = &node.name {
                 if node_name == name {
-                    trace!("Found node with name: {}", name);
+                    trace!("Found node with name: {name}");
                     new_results.push(node);
                 }
             }
@@ -318,7 +317,7 @@ impl<'a> AstQuery<'a> {
 
     /// Search for calls to a specific function
     pub fn calls_to(self, function_name: &str) -> Self {
-        debug!("Searching for calls to: {}", function_name);
+        debug!("Searching for calls to: {function_name}");
         let mut new_results = Vec::new();
 
         for node in self.results {
@@ -433,7 +432,7 @@ impl<'a> AstQuery<'a> {
             .into_iter()
             .map(|node| {
                 let description = match &node.name {
-                    Some(name) => format!("{} in '{}'", message, name),
+                    Some(name) => format!("{message} in '{name}'"),
                     None => message.to_string(),
                 };
 
@@ -448,8 +447,8 @@ impl<'a> AstQuery<'a> {
             .collect()
     }
 
-    /// Convert query results to findings with precise locations using SpanExtractor
-    /// This is the preferred method for dsl_query rules
+    /// Convert query results to findings with precise locations using `SpanExtractor`
+    /// This is the preferred method for `dsl_query` rules
     pub fn to_findings_with_span_extractor(
         self, 
         severity: Severity, 
@@ -478,12 +477,9 @@ impl<'a> AstQuery<'a> {
                 // Create descriptive message based on node name
                 let finding_description = match &node.name {
                     Some(name) => format!(
-                        "{} in '{}'. {}", 
-                        title, 
-                        name, 
-                        description
+                        "{title} in '{name}'. {description}"
                     ),
-                    None => format!("{}: {}", title, description),
+                    None => format!("{title}: {description}"),
                 };
 
                 Finding {
@@ -553,7 +549,7 @@ impl<'ast> Visit<'ast> for CallFinder {
         // Check if this is a call to our target function
         if let syn::Expr::Path(path) = &*call.func {
             if let Some(ident) = path.path.get_ident() {
-                if ident.to_string() == self.target_function {
+                if *ident == self.target_function {
                     self.found = true;
                     trace!("Found call to target function: {}", self.target_function);
                 }
@@ -566,7 +562,7 @@ impl<'ast> Visit<'ast> for CallFinder {
     
     fn visit_expr_method_call(&mut self, method_call: &'ast syn::ExprMethodCall) {
         // Check if this is a method call to our target function
-        if method_call.method.to_string() == self.target_function {
+        if method_call.method == self.target_function {
             self.found = true;
             trace!("Found method call to target function: {}", self.target_function);
         }

@@ -1,4 +1,4 @@
-use proc_macro2::{LineColumn, Span};
+use proc_macro2::Span;
 use syn::spanned::Spanned;
 use crate::analyzer::Location;
 use crate::analyzer::dsl::query::NodeData;
@@ -22,7 +22,7 @@ impl SpanExtractor {
         self.span_to_location(span)
     }
 
-    /// Convert a proc_macro2::Span to our Location struct
+    /// Convert a `proc_macro2::Span` to our Location struct
     pub fn span_to_location(&self, span: Span) -> Location {
         let start = span.start();
         let end = span.end();
@@ -132,9 +132,9 @@ impl SpanExtractor {
             let line = lines.get(line_idx).unwrap_or(&"");
             
             if actual_line_num >= start.line && actual_line_num <= end.line {
-                context.push_str(&format!("→ {:3} | {}\n", actual_line_num, line));
+                context.push_str(&format!("→ {actual_line_num:3} | {line}\n"));
             } else {
-                context.push_str(&format!("  {:3} | {}\n", actual_line_num, line));
+                context.push_str(&format!("  {actual_line_num:3} | {line}\n"));
             }
         }
         
@@ -219,7 +219,7 @@ impl Location {
     }
 }
 
-/// Extract span from NodeData
+/// Extract span from `NodeData`
 pub fn extract_span_from_node_data(node_data: &NodeData) -> Span {
     match node_data {
         NodeData::File(file) => file.span(),

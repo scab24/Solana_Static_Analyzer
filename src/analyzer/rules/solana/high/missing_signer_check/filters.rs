@@ -1,10 +1,9 @@
 
-use syn::{ItemStruct, Field, Attribute, Meta};
+use syn::{ItemStruct, Field, Attribute};
 use quote::{quote, ToTokens};
 use log::debug;
 use anchor_syn::{AccountsStruct, AccountField};
 use syn1;
-use std::path::Path;
 
 /// Filter for structs that have missing signer checks using anchor-syn
 pub fn has_missing_signer_checks(item_struct: &ItemStruct) -> bool {
@@ -34,7 +33,7 @@ pub fn has_missing_signer_checks(item_struct: &ItemStruct) -> bool {
             false
         },
         Err(e) => {
-            debug!("Failed to parse struct with anchor-syn: {}, using fallback", e);
+            debug!("Failed to parse struct with anchor-syn: {e}, using fallback");
             // Fallback to basic syn analysis
             has_missing_signer_checks_fallback(item_struct)
         }
@@ -57,10 +56,10 @@ fn is_accounts_struct(item_struct: &ItemStruct) -> bool {
 fn convert_to_anchor_struct_optimized(item_struct: &ItemStruct) -> Result<AccountsStruct, String> {
     let struct_source = generate_clean_struct_source(item_struct);
     
-    debug!("Generated clean struct source: {}", struct_source);
+    debug!("Generated clean struct source: {struct_source}");
     
     let syn1_struct: syn1::ItemStruct = syn1::parse_str(&struct_source)
-        .map_err(|e| format!("Failed to parse clean struct source: {}\nSource: {}", e, struct_source))?;
+        .map_err(|e| format!("Failed to parse clean struct source: {e}\nSource: {struct_source}"))?;
     
     debug!("Successfully parsed syn1 struct with {} fields", 
            match &syn1_struct.fields {
@@ -72,7 +71,7 @@ fn convert_to_anchor_struct_optimized(item_struct: &ItemStruct) -> Result<Accoun
     // Parse using accounts_parser::parse
     use anchor_syn::parser::accounts as accounts_parser;
     let accounts_struct = accounts_parser::parse(&syn1_struct)
-        .map_err(|e| format!("Failed to parse with accounts_parser: {}\nStruct: {:?}", e, syn1_struct))?;
+        .map_err(|e| format!("Failed to parse with accounts_parser: {e}\nStruct: {syn1_struct:?}"))?;
     
     debug!("Successfully created AccountsStruct with {} fields", accounts_struct.fields.len());
     
@@ -108,7 +107,7 @@ fn generate_clean_struct_source(item_struct: &ItemStruct) -> String {
             source.push_str("}\n");
         },
         syn::Fields::Unnamed(fields_unnamed) => {
-            source.push_str("(");
+            source.push('(');
             for (i, field) in fields_unnamed.unnamed.iter().enumerate() {
                 if i > 0 { source.push_str(", "); }
                 source.push_str(&quote!(#field.ty).to_string());
@@ -133,7 +132,7 @@ fn has_missing_signer_checks_fallback(item_struct: &ItemStruct) -> bool {
                 let field_type = quote::quote!(#field.ty).to_string();
                 
                 if field_needs_signer_check(field, &field_type) {
-                    debug!("Found field '{}' that may need signer verification", field_name);
+                    debug!("Found field '{field_name}' that may need signer verification");
                     return true;
                 }
             }
@@ -161,7 +160,7 @@ fn has_signer_constraint(attrs: &[Attribute]) -> bool {
         if attr.path().is_ident("account") {
             let tokens = attr.meta.to_token_stream().to_string();
             if tokens.contains("signer") {
-                debug!("Found signer constraint in attribute: {}", tokens);
+                debug!("Found signer constraint in attribute: {tokens}");
                 return true;
             }
         }

@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-use env_logger;
 use log::{debug, error, info, warn};
 use std::collections::HashMap;
 use std::fs;
@@ -47,7 +46,7 @@ fn main() -> Result<()> {
 
     // Parse arguments from command line
     let args = Cli::parse();
-    debug!("CLI arguments: {:?}", args);
+    debug!("CLI arguments: {args:?}");
 
     // Verify that the path exists
     if !args.path.exists() {
@@ -60,12 +59,12 @@ fn main() -> Result<()> {
     }
 
     info!("Starting analysis on directory: {}", args.path.display());
-    let results = ast::parser::process_directory(&args.path)?;
+    let results = ast::parser::process_directory(&args.path);
     info!("Found {} Rust files to analyze", results.len());
 
     if args.ast {
         for (path, ast) in &results {
-            let json = ast::json::ast_to_json(&ast)?;
+            let json = ast::json::ast_to_json(ast);
             let mut json_path = path.clone();
             json_path.set_extension("json");
             fs::write(json_path, json)?;
@@ -102,7 +101,7 @@ fn main() -> Result<()> {
                     "informational" => options
                         .ignore_severities
                         .push(analyzer::Severity::Informational),
-                    _ => warn!("Unknown severity level: {}", sev),
+                    _ => warn!("Unknown severity level: {sev}"),
                 }
             }
         }
@@ -137,7 +136,7 @@ fn main() -> Result<()> {
                     analyzer::Severity::Informational,
                 ] {
                     if let Some(count) = severity_counts.get(severity) {
-                        info!("- {:?}: {}", severity, count);
+                        info!("- {severity:?}: {count}");
                     }
                 }
 
@@ -147,13 +146,15 @@ fn main() -> Result<()> {
                         analysis_result.findings.clone(),
                         args.path.to_string_lossy().to_string(),
                     );
-                    
+
                     let output_str = output_path.to_string_lossy();
                     if output_str.ends_with(".md") || output_str.ends_with(".markdown") {
                         // Generate Markdown report
                         match report_generator.save_markdown_report(&output_str) {
-                            Ok(()) => info!("📄 Markdown report saved to: {}", output_path.display()),
-                            Err(e) => error!("Failed to save report: {}", e),
+                            Ok(()) => {
+                                info!("📄 Markdown report saved to: {}", output_path.display());
+                            }
+                            Err(e) => error!("Failed to save report: {e}"),
                         }
                     } else {
                         // Default to Markdown with .md extension
@@ -161,7 +162,7 @@ fn main() -> Result<()> {
                         md_path.set_extension("md");
                         match report_generator.save_markdown_report(&md_path.to_string_lossy()) {
                             Ok(()) => info!("📄 Markdown report saved to: {}", md_path.display()),
-                            Err(e) => error!("Failed to save report: {}", e),
+                            Err(e) => error!("Failed to save report: {e}"),
                         }
                     }
                 } else {
@@ -189,7 +190,7 @@ fn main() -> Result<()> {
                             analyzer::Severity::Informational,
                         ] {
                             if let Some(findings) = findings_by_severity.get(severity) {
-                                info!("----- {:?} Severity Findings -----", severity);
+                                info!("----- {severity:?} Severity Findings -----");
 
                                 for finding in findings {
                                     info!(
@@ -202,7 +203,7 @@ fn main() -> Result<()> {
 
                                     // Show code snippet if available
                                     if let Some(snippet) = &finding.code_snippet {
-                                        debug!("    Code: {}", snippet);
+                                        debug!("    Code: {snippet}");
                                     }
 
                                     index += 1;
@@ -213,7 +214,7 @@ fn main() -> Result<()> {
                 }
             }
             Err(e) => {
-                error!("Error during analysis: {}", e);
+                error!("Error during analysis: {e}");
             }
         }
     }
