@@ -1,12 +1,10 @@
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use log::{debug, info, warn};
 use syn::File;
 
-use crate::analyzer::dsl::AstQuery;
 use crate::analyzer::{Finding, Severity};
 
 /// Type of rule
@@ -205,7 +203,7 @@ pub struct RustRule {
     /// Recommendations for fixing the issue
     recommendations: Vec<String>,
 
-    /// Function that implements the rule check with SpanExtractor support
+    /// Function that implements the rule check with `SpanExtractor` support
     check_fn: Box<dyn Fn(&File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Result<Vec<Finding>> + Send + Sync>,
 }
 
@@ -262,7 +260,7 @@ impl Rule for RustRule {
 
     fn execute(&self, ast: &File, file_path: &str) -> Result<Vec<Finding>> {
         // Fallback: create SpanExtractor with empty source for backward compatibility
-        let span_extractor = crate::analyzer::span_utils::SpanExtractor::new("".to_string(), file_path.to_string());
+        let span_extractor = crate::analyzer::span_utils::SpanExtractor::new(String::new(), file_path.to_string());
         (self.check_fn)(ast, file_path, &span_extractor)
     }
 

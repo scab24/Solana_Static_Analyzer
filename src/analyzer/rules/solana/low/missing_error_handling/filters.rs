@@ -42,7 +42,7 @@ impl<'a> MissingErrorHandlingFilters<'a> for AstQuery<'a> {
 fn returns_result_type(output: &syn::ReturnType) -> bool {
     match output {
         syn::ReturnType::Type(_, ty) => {
-            let type_str = format!("{:?}", ty);
+            let type_str = format!("{ty:?}");
             type_str.contains("Result")
         }
         syn::ReturnType::Default => false,

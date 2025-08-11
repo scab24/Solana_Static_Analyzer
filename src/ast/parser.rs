@@ -19,27 +19,27 @@ pub fn parse_rust_code(content: &str) -> Result<syn::File> {
 }
 
 /// Process a directory and return a vector of (path, AST) pairs
-pub fn process_directory(dir_path: &Path) -> Result<Vec<(PathBuf, syn::File)>> {
+pub fn process_directory(dir_path: &Path) -> Vec<(PathBuf, syn::File)> {
     let mut results = Vec::new();
 
     for entry in WalkDir::new(dir_path)
         .follow_links(true)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
     {
         let path = entry.path();
 
         // Only process Rust files
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "rs") {
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
             match parse_rust_file(path) {
                 Ok(ast) => {
                     info!("Successfully parsed file {}", path.display());
-                    results.push((path.to_path_buf(), ast))
+                    results.push((path.to_path_buf(), ast));
                 }
                 Err(e) => error!("Failed to parse file {}: {}", path.display(), e),
             }
         }
     }
     info!("Processed {} Rust files", results.len());
-    Ok(results)
+    results
 }

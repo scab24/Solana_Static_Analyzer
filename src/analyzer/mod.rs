@@ -7,11 +7,9 @@ pub mod span_utils;
 
 // Standard imports
 use anyhow::Context;
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 use syn::File;
 
 /// Severity level of a vulnerability
@@ -148,7 +146,7 @@ impl Analyzer {
 
         // Load built-in rules
         if let Err(e) = rule_engine.load_builtin_rules() {
-            warn!("Failed to load built-in rules: {}", e);
+            warn!("Failed to load built-in rules: {e}");
         }
 
         // Load custom rules if specified
@@ -174,17 +172,17 @@ impl Analyzer {
 
     /// Analyzes a single file
     pub fn analyze_file(&self, file_path: &str, ast: &File) -> Result<Vec<Finding>> {
-        debug!("Analyzing file: {}", file_path);
+        debug!("Analyzing file: {file_path}");
 
         // Read source code for precise locations
         let source_code = std::fs::read_to_string(file_path)
-            .with_context(|| format!("Failed to read source code from {}", file_path))?;
+            .with_context(|| format!("Failed to read source code from {file_path}"))?;
 
         // Execute rules on the AST with source code for precise locations
         let findings = self
             .rule_engine
             .execute_rules(ast, file_path, &source_code)
-            .with_context(|| format!("Failed to execute rules on {}", file_path))?;
+            .with_context(|| format!("Failed to execute rules on {file_path}"))?;
 
         debug!("Found {} issues in {}", findings.len(), file_path);
 
@@ -219,12 +217,12 @@ impl Analyzer {
                     all_findings.extend(findings);
                 }
                 Err(e) => {
-                    warn!("Error analyzing {}: {}", file_path, e);
+                    warn!("Error analyzing {file_path}: {e}");
                 }
             }
         }
 
-        stats.total_time_ms = start_time.elapsed().as_millis() as u64;
+        stats.total_time_ms = u64::try_from(start_time.elapsed().as_millis())?;
 
         info!(
             "Analysis completed: {} findings in {}ms",

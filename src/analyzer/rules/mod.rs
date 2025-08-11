@@ -1,9 +1,8 @@
 pub mod solana;
 
 use crate::analyzer::Result;
-use crate::analyzer::engine::{Rule, RuleEngine};
+use crate::analyzer::engine::RuleEngine;
 
-pub use solana::*;
 
 /// Register all built-in rules in the rule engine
 pub fn register_builtin_rules(engine: &mut RuleEngine) -> Result<()> {

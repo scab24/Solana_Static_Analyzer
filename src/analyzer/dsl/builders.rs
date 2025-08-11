@@ -1,11 +1,9 @@
 use log::{debug, info};
-use std::marker::PhantomData;
 use std::sync::Arc;
 use syn::File;
 
 use crate::analyzer::{Finding, Severity};
 use crate::analyzer::engine::{Rule, RuleType, RustRule};
-use crate::analyzer::dsl::query::AstQuery;
 
 /// Rule builder to facilitate the creation of static analysis rules
 ///
@@ -23,7 +21,7 @@ pub struct RuleBuilder {
     severity: Severity,
     /// Rule type
     rule_type: RuleType,
-    /// Query builder with SpanExtractor support
+    /// Query builder with `SpanExtractor` support
     query_builder: Option<Box<dyn Fn(&File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Vec<Finding> + Send + Sync>>,
     /// References to documentation or additional resources
     references: Vec<String>,
@@ -91,7 +89,7 @@ impl RuleBuilder {
         self
     }
 
-    /// Sets a DSL-based rule implementation with SpanExtractor for precise locations
+    /// Sets a DSL-based rule implementation with `SpanExtractor` for precise locations
     pub fn dsl_rule<F>(mut self, rule_fn: F) -> Self
     where
         F: Fn(&syn::File, &str, &crate::analyzer::span_utils::SpanExtractor) -> Vec<crate::analyzer::Finding> + Send + Sync + 'static,
@@ -113,7 +111,7 @@ impl RuleBuilder {
         self
     }
 
-    /// Sets a DSL-based query builder (function that returns AstQuery for more expressive queries)
+    /// Sets a DSL-based query builder (function that returns `AstQuery` for more expressive queries)
     /// This is the new, preferred way to define rules using the DSL
     pub fn dsl_query<F>(mut self, dsl_builder: F) -> Self
     where
@@ -237,10 +235,10 @@ impl RuleBuilder {
 
         // Log information about the rule
         if !references.is_empty() {
-            info!("References for rule {}: {:?}", id, references);
+            info!("References for rule {id}: {references:?}");
         }
         if !tags.is_empty() {
-            info!("Tags for rule {}: {:?}", id, tags);
+            info!("Tags for rule {id}: {tags:?}");
         }
 
         if !enabled {
@@ -257,7 +255,7 @@ impl RuleBuilder {
             rule_type,
             recommendations,
             move |ast, file_path, span_extractor| {
-                debug!("Executing rule {} in {}", id_clone, file_path);
+                debug!("Executing rule {id_clone} in {file_path}");
 
                 // Execute the query with SpanExtractor and get findings directly
                 let findings = query_builder(ast, file_path, span_extractor);
@@ -266,7 +264,7 @@ impl RuleBuilder {
                 if enabled {
                     Ok(findings)
                 } else {
-                    debug!("Rule {} is disabled, no findings returned", id_clone);
+                    debug!("Rule {id_clone} is disabled, no findings returned");
                     Ok(Vec::new())
                 }
             },

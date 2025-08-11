@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::analyzer::dsl::{RuleBuilder, AstQuery};
 use crate::analyzer::{Rule, Severity};
-use crate::analyzer::engine::RuleType;
 
 // Import our specific filters
 mod filters;
