@@ -13,33 +13,30 @@ impl<'a> OwnerCheckFilters<'a> for AstQuery<'a> {
         let mut new_results = Vec::new();
 
         for node in self.results() {
-            match node.data {
-                NodeData::Struct(struct_item) => {
-                    if let Fields::Named(named_fields) = &struct_item.fields {
-                        let has_owner_check = named_fields.named.iter().any(|field| {
-                            field.attrs.iter().any(|attr| {
-                                if let Meta::List(meta_list) = &attr.meta {
-                                    if meta_list.path.is_ident("account") {
-                                        let tokens_str = meta_list.tokens.to_string();
-                                        tokens_str.contains("owner") || 
-                                        tokens_str.contains("address") ||
-                                        (tokens_str.contains("constraint") && tokens_str.contains("owner"))
-                                    } else {
-                                        false
-                                    }
+            if let NodeData::Struct(struct_item) = node.data {
+                if let Fields::Named(named_fields) = &struct_item.fields {
+                    let has_owner_check = named_fields.named.iter().any(|field| {
+                        field.attrs.iter().any(|attr| {
+                            if let Meta::List(meta_list) = &attr.meta {
+                                if meta_list.path.is_ident("account") {
+                                    let tokens_str = meta_list.tokens.to_string();
+                                    tokens_str.contains("owner") || 
+                                    tokens_str.contains("address") ||
+                                    (tokens_str.contains("constraint") && tokens_str.contains("owner"))
                                 } else {
                                     false
                                 }
-                            })
-                        });
+                            } else {
+                                false
+                            }
+                        })
+                    });
 
-                        if has_owner_check {
-                            trace!("Found struct with owner check: {}", struct_item.ident);
-                            new_results.push(node.clone());
-                        }
+                    if has_owner_check {
+                        trace!("Found struct with owner check: {}", struct_item.ident);
+                        new_results.push(node.clone());
                     }
                 }
-                _ => {}
             }
         }
 
@@ -74,7 +71,7 @@ impl<'ast> Visit<'ast> for OwnerCheckFinder {
                 let tokens_str = mac.mac.tokens.to_string();
                 if tokens_str.contains("owner") {
                     self.found = true;
-                    trace!("Found owner check in {} macro", macro_name);
+                    trace!("Found owner check in {macro_name} macro");
                 }
             }
         }
